@@ -112,6 +112,7 @@
     padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
     background: var(--card); color: var(--ink); font: inherit; text-align: left; cursor: pointer;
   }
+  .ko-read { color: var(--muted); font-family: "Noto Sans KR", sans-serif; font-size: .85em; margin-left: 2px; }
   .choice small { display: block; color: var(--muted); font-size: .78rem; }
   .choice.correct { border-color: var(--good); background: var(--good-bg); }
   .choice.wrong { border-color: var(--bad); background: var(--bad-bg); }
@@ -414,8 +415,8 @@
     $('studyKanji').textContent = x.k;
     $('studyKo').textContent = x.ko;
     $('studyEn').textContent = x.en;
-    $('studyOn').textContent = x.on || '없음';
-    $('studyKun').textContent = x.kun || '없음';
+    $('studyOn').innerHTML = readingHtml(x.on) || '없음';
+    $('studyKun').innerHTML = readingHtml(x.kun) || '없음';
     $('prevBtn').disabled = i === 0;
     $('nextBtn').textContent = i === set.length - 1 ? '퀴즈 시작' : '다음';
   }
@@ -436,6 +437,53 @@
     session.results = {};
     renderQuiz();
     show('quiz');
+  }
+
+  // ---------- 가나 → 한글 발음 ----------
+  // 가나를 한 글자씩 한글로 옮김(장음도 그대로 표기: ユウ → 유우). ン은 받침 ㄴ, ッ은 받침 ㅅ.
+  const KANA_KO = {
+    ア:'아',イ:'이',ウ:'우',エ:'에',オ:'오',カ:'카',キ:'키',ク:'쿠',ケ:'케',コ:'코',
+    サ:'사',シ:'시',ス:'스',セ:'세',ソ:'소',タ:'타',チ:'치',ツ:'쓰',テ:'테',ト:'토',
+    ナ:'나',ニ:'니',ヌ:'누',ネ:'네',ノ:'노',ハ:'하',ヒ:'히',フ:'후',ヘ:'헤',ホ:'호',
+    マ:'마',ミ:'미',ム:'무',メ:'메',モ:'모',ヤ:'야',ユ:'유',ヨ:'요',
+    ラ:'라',リ:'리',ル:'루',レ:'레',ロ:'로',ワ:'와',ヰ:'이',ヱ:'에',ヲ:'오',
+    ガ:'가',ギ:'기',グ:'구',ゲ:'게',ゴ:'고',ザ:'자',ジ:'지',ズ:'즈',ゼ:'제',ゾ:'조',
+    ダ:'다',ヂ:'지',ヅ:'즈',デ:'데',ド:'도',バ:'바',ビ:'비',ブ:'부',ベ:'베',ボ:'보',
+    パ:'파',ピ:'피',プ:'푸',ペ:'페',ポ:'포',ヴ:'부',
+    ァ:'아',ィ:'이',ゥ:'우',ェ:'에',ォ:'오',ャ:'야',ュ:'유',ョ:'요',ヮ:'와',
+  };
+  const YOON_KO = {
+    キャ:'캬',キュ:'큐',キョ:'쿄',シャ:'샤',シュ:'슈',ショ:'쇼',チャ:'차',チュ:'추',チョ:'초',
+    ニャ:'냐',ニュ:'뉴',ニョ:'뇨',ヒャ:'햐',ヒュ:'휴',ヒョ:'효',ミャ:'먀',ミュ:'뮤',ミョ:'묘',
+    リャ:'랴',リュ:'류',リョ:'료',ギャ:'갸',ギュ:'규',ギョ:'교',ジャ:'자',ジュ:'주',ジョ:'조',
+    ヂャ:'자',ヂュ:'주',ヂョ:'조',ビャ:'뱌',ビュ:'뷰',ビョ:'뵤',ピャ:'퍄',ピュ:'퓨',ピョ:'표',
+  };
+  function addFinal(out, jong) {
+    const last = out.length - 1;
+    const c = last >= 0 ? out[last].charCodeAt(0) - 0xAC00 : -1;
+    if (c >= 0 && c < 11172 && c % 28 === 0) out[last] = String.fromCharCode(0xAC00 + c + jong);
+  }
+  function kanaToHangul(str) {
+    // 히라가나는 가타카나로 바꾸고, 괄호·기호는 버림
+    const kata = [...str]
+      .map(ch => { const c = ch.charCodeAt(0); return c >= 0x3041 && c <= 0x3096 ? String.fromCharCode(c + 0x60) : ch; })
+      .filter(ch => KANA_KO[ch] || ch === 'ン' || ch === 'ッ');
+    const out = [];
+    for (let i = 0; i < kata.length; i++) {
+      const pair = kata[i] + (kata[i + 1] || '');
+      if (YOON_KO[pair]) { out.push(YOON_KO[pair]); i++; }
+      else if (kata[i] === 'ン') addFinal(out, 4);
+      else if (kata[i] === 'ッ') addFinal(out, 19);
+      else out.push(KANA_KO[kata[i]]);
+    }
+    return out.join('');
+  }
+  // "イチ、イツ" → "イチ(이치)、イツ(이쓰)"
+  function readingText(str) {
+    return str ? str.split('、').map(r => `${r}(${kanaToHangul(r)})`).join('、') : '';
+  }
+  function readingHtml(str) {
+    return str ? str.split('、').map(r => `${r}<span class="ko-read">(${kanaToHangul(r)})</span>`).join('、') : '';
   }
 
   function readingOf(x) { return x.on ? { label: '음독', val: x.on } : { label: '훈독', val: x.kun }; }
@@ -477,7 +525,7 @@
       $('quizQuestion').textContent = `이 한자의 ${label}은?`;
       const field = r.label === '음독' ? (y => y.on) : (y => y.kun);
       opts = shuffle([x, ...distractors(x, field)]).map(y => ({
-        ok: y.k === x.k, html: `<span class="jp">${field(y)}</span>`
+        ok: y.k === x.k, html: `<span class="jp">${readingHtml(field(y))}</span>`
       }));
     }
     $('choices').innerHTML = opts.map((o, i) =>
@@ -503,7 +551,7 @@
     const fb = $('feedback');
     if (ok) { fb.textContent = '정답입니다!'; fb.className = 'feedback good'; }
     else {
-      const ans = session.step === 0 ? x.ko : readingOf(x).val;
+      const ans = session.step === 0 ? x.ko : readingText(readingOf(x).val);
       fb.textContent = `오답입니다. 정답: ${ans}`;
       fb.className = 'feedback bad';
     }
@@ -543,7 +591,7 @@
       <div class="item">
         <div class="k">${x.k}</div>
         <div class="d"><b>${x.ko}</b> · ${x.en}<br>
-          <span class="jp">음 ${x.on || '-'} / 훈 ${x.kun || '-'}</span></div>
+          <span class="jp">음 ${readingHtml(x.on) || '-'} / 훈 ${readingHtml(x.kun) || '-'}</span></div>
       </div>`).join('');
     $('retryWrongBtn').classList.toggle('hidden', !wrong.length);
     $('nextSetBtn').textContent = session.mode === 'review' ? '복습 계속하기' : '다음 세트';
