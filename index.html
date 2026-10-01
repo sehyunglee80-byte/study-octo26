@@ -100,7 +100,7 @@
     <canvas id="board" width="300" height="300" aria-label="게임 화면"></canvas>
     <div class="overlay" id="overlay">
       <h1 id="ov-title">SNAKE</h1>
-      <p id="ov-text">방향키 또는 화면 스와이프로 움직이세요.<br>벽이나 내 몸에 닿으면 끝납니다.</p>
+      <p id="ov-text">방향키 또는 화면 스와이프로 움직이세요.<br>벽을 넘으면 반대편에서 나옵니다.<br>내 몸에 닿으면 끝납니다.</p>
       <button class="btn" id="start">시작하기</button>
     </div>
   </div>
@@ -152,10 +152,11 @@
   function tick() {
     dir = nextDir;
     const [dx, dy] = DIRS[dir];
-    const head = [snake[0][0] + dx, snake[0][1] + dy];
-    const hitWall = head[0] < 0 || head[1] < 0 || head[0] >= N || head[1] >= N;
-    const hitSelf = snake.some(([x, y]) => x === head[0] && y === head[1]);
-    if (hitWall || hitSelf) return gameOver();
+    // 벽을 넘으면 반대편에서 나옴
+    const head = [(snake[0][0] + dx + N) % N, (snake[0][1] + dy + N) % N];
+    // 이번 턴에 비워질 꼬리 칸은 부딪힘에서 제외
+    const body = snake.slice(0, -1);
+    if (body.some(([x, y]) => x === head[0] && y === head[1])) return gameOver();
 
     snake.unshift(head);
     if (head[0] === food[0] && head[1] === food[1]) {
