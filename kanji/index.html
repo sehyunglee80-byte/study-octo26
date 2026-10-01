@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>교육한자 학습</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+  :root {
+    --bg: #f6f3ee;
+    --card: #ffffff;
+    --ink: #1f1d1a;
+    --muted: #6f6a62;
+    --line: #e2ddd4;
+    --accent: #b8322a;
+    --accent-ink: #ffffff;
+    --good: #2e7d4f;
+    --good-bg: #e3f2e8;
+    --bad: #b8322a;
+    --bad-bg: #f8e3e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1917;
+      --card: #252320;
+      --ink: #f1ede6;
+      --muted: #a39d93;
+      --line: #3a3732;
+      --accent: #e0574d;
+      --accent-ink: #1a1917;
+      --good: #6cc48e;
+      --good-bg: #20352a;
+      --bad: #ef7b72;
+      --bad-bg: #3d2523;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Sans KR", "Noto Sans JP", sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 520px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  h2 { font-size: 1rem; margin: 20px 0 8px; color: var(--muted); font-weight: 700; }
+  .sub { color: var(--muted); font-size: .9rem; margin: 0 0 8px; }
+  .jp { font-family: "Noto Sans JP", sans-serif; }
+  .hidden { display: none !important; }
+
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button {
+    flex: 1 1 0; min-width: 56px; padding: 10px 6px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    border-radius: 10px; font: inherit; cursor: pointer;
+  }
+  .seg button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .seg button small { display: block; font-size: .72rem; opacity: .75; }
+
+  .btn {
+    display: block; width: 100%; padding: 14px; margin-top: 10px;
+    border: none; border-radius: 12px; font: inherit; font-weight: 700; font-size: 1rem;
+    background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .row { display: flex; gap: 8px; }
+  .row .btn { flex: 1; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+  .stat b { display: block; font-size: 1.2rem; }
+  .stat span { font-size: .75rem; color: var(--muted); }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .top .link { background: none; border: none; color: var(--muted); font: inherit; cursor: pointer; padding: 6px 0; }
+  .progress { color: var(--muted); font-size: .9rem; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 20px; margin-top: 12px; text-align: center;
+  }
+  .kanji { font-family: "Noto Sans JP", serif; font-size: 7rem; line-height: 1.15; margin: 4px 0 8px; }
+  .meaning { font-size: 1.4rem; font-weight: 700; }
+  .en { color: var(--muted); font-size: .9rem; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; margin: 16px 0 0; }
+  dt { color: var(--muted); font-size: .85rem; padding-top: 2px; }
+  dd { margin: 0; font-family: "Noto Sans JP", sans-serif; font-size: 1.05rem; word-break: keep-all; }
+  .tag { display: inline-block; font-size: .75rem; padding: 2px 8px; border-radius: 99px; background: var(--bg); color: var(--muted); }
+
+  .question { font-weight: 700; margin: 16px 0 8px; }
+  .choices { display: grid; gap: 8px; }
+  .choice {
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+  }
+  .choice small { display: block; color: var(--muted); font-size: .78rem; }
+  .choice.correct { border-color: var(--good); background: var(--good-bg); }
+  .choice.wrong { border-color: var(--bad); background: var(--bad-bg); }
+  .choice:disabled { cursor: default; }
+  .feedback { margin-top: 10px; font-weight: 700; min-height: 1.5em; }
+  .feedback.good { color: var(--good); }
+  .feedback.bad { color: var(--bad); }
+
+  .result-score { font-size: 3rem; font-weight: 700; margin: 4px 0; }
+  .list { display: grid; gap: 8px; margin-top: 8px; }
+  .item {
+    display: flex; align-items: center; gap: 12px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; text-align: left;
+  }
+  .item .k { font-family: "Noto Sans JP", serif; font-size: 2rem; min-width: 2.2rem; text-align: center; }
+  .item .d { font-size: .88rem; }
+  .item .d .jp { color: var(--muted); }
+  .empty { color: var(--muted); font-size: .9rem; }
+  footer { margin-top: 32px; color: var(--muted); font-size: .72rem; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- 홈 -->
+  <section id="home">
+    <h1>교육한자 학습</h1>
+    <p class="sub">일본 초등학교 학년별 교육한자 1,026자</p>
+
+    <h2>학년</h2>
+    <div class="seg" id="gradeSeg"></div>
+
+    <div class="stats">
+      <div class="stat"><b id="stLearned">0</b><span>학습한 한자</span></div>
+      <div class="stat"><b id="stRate">-</b><span>정답률</span></div>
+      <div class="stat"><b id="stWrong">0</b><span>복습할 한자</span></div>
+    </div>
+    <div class="bar"><i id="stBar" style="width:0"></i></div>
+
+    <h2>세트 크기</h2>
+    <div class="seg" id="sizeSeg"></div>
+
+    <button class="btn" id="startBtn">학습 시작</button>
+    <button class="btn ghost" id="reviewBtn">틀린 한자 복습</button>
+    <button class="btn ghost" id="resetBtn">이 학년 기록 초기화</button>
+  </section>
+
+  <!-- 학습 -->
+  <section id="study" class="hidden">
+    <div class="top">
+      <button class="link" data-home>← 처음으로</button>
+      <span class="progress" id="studyProgress"></span>
+    </div>
+    <div class="card">
+      <span class="tag" id="studyGrade"></span>
+      <div class="kanji" id="studyKanji"></div>
+      <div class="meaning" id="studyKo"></div>
+      <div class="en" id="studyEn"></div>
+      <dl>
+        <dt>음독</dt><dd id="studyOn"></dd>
+        <dt>훈독</dt><dd id="studyKun"></dd>
+      </dl>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="prevBtn">이전</button>
+      <button class="btn" id="nextBtn">다음</button>
+    </div>
+  </section>
+
+  <!-- 퀴즈 -->
+  <section id="quiz" class="hidden">
+    <div class="top">
+      <button class="link" data-home>← 처음으로</button>
+      <span class="progress" id="quizProgress"></span>
+    </div>
+    <div class="card">
+      <div class="kanji" id="quizKanji"></div>
+    </div>
+    <div class="question" id="quizQuestion"></div>
+    <div class="choices" id="choices"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="btn hidden" id="quizNext">다음</button>
+  </section>
+
+  <!-- 결과 -->
+  <section id="result" class="hidden">
+    <div class="card">
+      <div class="sub">이번 세트 결과</div>
+      <div class="result-score" id="resultScore"></div>
+      <div class="sub" id="resultSub"></div>
+    </div>
+    <h2 id="wrongTitle">틀린 한자</h2>
+    <div class="list" id="wrongList"></div>
+    <button class="btn" id="retryWrongBtn">틀린 한자 다시 학습</button>
+    <button class="btn" id="nextSetBtn">다음 세트</button>
+    <button class="btn ghost" data-home>처음으로</button>
+  </section>
+
+  <footer>
+    음독·훈독·영어 뜻 출처: KANJIDIC(EDRDG) 기반
+    <a href="https://github.com/mifunetoshiro/kanjium" target="_blank" rel="noopener">kanjium</a>
+    (CC BY-SA 4.0). 학년 배정은 2020년 학습지도요령 기준.
+  </footer>
+</main>
+
+<script src="kanji-data.js"></script>
+<script>
+  // 데이터: [한자, 학년, 한국어 훈음, 영어 뜻, 음독, 훈독]
+  const ALL = KANJI_DATA.map(([k, g, ko, en, on, kun]) => ({ k, g, ko, en, on, kun }));
+  const BY_K = Object.fromEntries(ALL.map(x => [x.k, x]));
+  const GRADES = [1, 2, 3, 4, 5, 6];
+  const SIZES = [5, 10, 20];
+  const STORE_KEY = 'kanji-study-v1';
+
+  // 저장소: { settings: {grade, size}, cards: { 한자: {c: 정답 수, w: 오답 수, miss: 마지막 퀴즈 오답 여부} } }
+  function loadStore() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (s && s.cards) return s;
+    } catch (e) {}
+    return { settings: { grade: 1, size: 10 }, cards: {} };
+  }
+  function saveStore() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
+  }
+  const store = loadStore();
+
+  const $ = id => document.getElementById(id);
+  const shuffle = a => {
+    a = a.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  // 세션 상태
+  let session = null; // { set: [...], mode: 'new' | 'review', studyIdx, quizIdx, step, results: {k: ok} }
+
+  function show(id) {
+    for (const s of ['home', 'study', 'quiz', 'result']) $(s).classList.toggle('hidden', s !== id);
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- 홈 ----------
+  function gradeKanji(g) { return ALL.filter(x => x.g === g); }
+
+  function renderHome() {
+    const { grade, size } = store.settings;
+    $('gradeSeg').innerHTML = GRADES.map(g =>
+      `<button data-g="${g}" class="${g === grade ? 'on' : ''}">${g}학년<small>${gradeKanji(g).length}자</small></button>`
+    ).join('');
+    $('sizeSeg').innerHTML = SIZES.map(n =>
+      `<button data-n="${n}" class="${n === size ? 'on' : ''}">${n}개</button>`
+    ).join('');
+
+    const list = gradeKanji(grade);
+    let learned = 0, c = 0, w = 0, miss = 0;
+    for (const x of list) {
+      const s = store.cards[x.k];
+      if (!s) continue;
+      learned++; c += s.c; w += s.w;
+      if (s.miss) miss++;
+    }
+    $('stLearned').textContent = `${learned}/${list.length}`;
+    $('stRate').textContent = c + w ? Math.round(c / (c + w) * 100) + '%' : '-';
+    $('stWrong').textContent = miss;
+    $('stBar').style.width = (learned / list.length * 100) + '%';
+    $('reviewBtn').disabled = miss === 0;
+    $('startBtn').textContent = learned === list.length ? '학습 시작 (전체 학습 완료, 무작위 출제)' : '학습 시작';
+  }
+
+  $('gradeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    store.settings.grade = +b.dataset.g; saveStore(); renderHome();
+  });
+  $('sizeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    store.settings.size = +b.dataset.n; saveStore(); renderHome();
+  });
+
+  // 아직 학습하지 않은 한자를 순서대로 고르고, 모두 학습했으면 무작위로 고름
+  function pickNewSet() {
+    const { grade, size } = store.settings;
+    const list = gradeKanji(grade);
+    const fresh = list.filter(x => !store.cards[x.k]);
+    return fresh.length ? fresh.slice(0, size) : shuffle(list).slice(0, size);
+  }
+  function pickReviewSet() {
+    const { grade, size } = store.settings;
+    return shuffle(gradeKanji(grade).filter(x => store.cards[x.k] && store.cards[x.k].miss)).slice(0, size);
+  }
+
+  function startSession(set, mode) {
+    session = { set, mode, studyIdx: 0, quizIdx: 0, step: 0, order: [], results: {} };
+    renderStudy();
+    show('study');
+  }
+
+  $('startBtn').addEventListener('click', () => startSession(pickNewSet(), 'new'));
+  $('reviewBtn').addEventListener('click', () => {
+    const set = pickReviewSet();
+    if (set.length) startSession(set, 'review');
+  });
+  $('resetBtn').addEventListener('click', () => {
+    const g = store.settings.grade;
+    if (!confirm(`${g}학년 학습 기록을 모두 지울까요?`)) return;
+    for (const x of gradeKanji(g)) delete store.cards[x.k];
+    saveStore(); renderHome();
+  });
+  document.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => {
+    if (!$('home').classList.contains('hidden')) return;
+    if (session && !$('quiz').classList.contains('hidden') && !confirm('퀴즈를 중단하고 처음으로 돌아갈까요?')) return;
+    session = null; renderHome(); show('home');
+  }));
+
+  // ---------- 학습 ----------
+  function renderStudy() {
+    const { set, studyIdx: i } = session;
+    const x = set[i];
+    $('studyProgress').textContent = `학습 ${i + 1} / ${set.length}`;
+    $('studyGrade').textContent = `${x.g}학년`;
+    $('studyKanji').textContent = x.k;
+    $('studyKo').textContent = x.ko;
+    $('studyEn').textContent = x.en;
+    $('studyOn').textContent = x.on || '없음';
+    $('studyKun').textContent = x.kun || '없음';
+    $('prevBtn').disabled = i === 0;
+    $('nextBtn').textContent = i === set.length - 1 ? '퀴즈 시작' : '다음';
+  }
+  $('prevBtn').addEventListener('click', () => {
+    if (session.studyIdx > 0) { session.studyIdx--; renderStudy(); }
+  });
+  $('nextBtn').addEventListener('click', () => {
+    if (session.studyIdx < session.set.length - 1) { session.studyIdx++; renderStudy(); }
+    else startQuiz();
+  });
+
+  // ---------- 퀴즈 ----------
+  // 한 한자당 2단계: 0 = 뜻, 1 = 읽기(음독, 음독이 없는 한자는 훈독)
+  function startQuiz() {
+    session.order = shuffle(session.set);
+    session.quizIdx = 0;
+    session.step = 0;
+    session.results = {};
+    renderQuiz();
+    show('quiz');
+  }
+
+  function readingOf(x) { return x.on ? { label: '음독', val: x.on } : { label: '훈독', val: x.kun }; }
+
+  // 같은 학년(부족하면 전체)에서 정답과 겹치지 않는 오답 3개 고르기
+  function distractors(x, field) {
+    const ans = field(x);
+    const seen = new Set([ans]);
+    const out = [];
+    for (const pool of [shuffle(gradeKanji(x.g)), shuffle(ALL)]) {
+      for (const y of pool) {
+        const v = field(y);
+        if (!v || seen.has(v) || y.k === x.k) continue;
+        seen.add(v); out.push(y);
+        if (out.length === 3) return out;
+      }
+    }
+    return out;
+  }
+
+  function renderQuiz() {
+    const { order, quizIdx, step } = session;
+    const x = order[quizIdx];
+    $('quizProgress').textContent = `퀴즈 ${quizIdx + 1} / ${order.length} · ${step === 0 ? '뜻' : '읽기'}`;
+    $('quizKanji').textContent = x.k;
+    $('feedback').textContent = '';
+    $('feedback').className = 'feedback';
+    $('quizNext').classList.add('hidden');
+
+    let opts, label;
+    if (step === 0) {
+      $('quizQuestion').textContent = '이 한자의 뜻은?';
+      opts = shuffle([x, ...distractors(x, y => y.ko)]).map(y => ({
+        ok: y.k === x.k, html: `${y.ko}<small>${y.en}</small>`
+      }));
+    } else {
+      const r = readingOf(x);
+      label = r.label;
+      $('quizQuestion').textContent = `이 한자의 ${label}은?`;
+      const field = r.label === '음독' ? (y => y.on) : (y => y.kun);
+      opts = shuffle([x, ...distractors(x, field)]).map(y => ({
+        ok: y.k === x.k, html: `<span class="jp">${field(y)}</span>`
+      }));
+    }
+    $('choices').innerHTML = opts.map((o, i) =>
+      `<button class="choice" data-i="${i}" data-ok="${o.ok ? 1 : 0}">${o.html}</button>`
+    ).join('');
+  }
+
+  $('choices').addEventListener('click', e => {
+    const b = e.target.closest('.choice');
+    if (!b || b.disabled) return;
+    const buttons = [...$('choices').children];
+    buttons.forEach(btn => {
+      btn.disabled = true;
+      if (btn.dataset.ok === '1') btn.classList.add('correct');
+    });
+    const ok = b.dataset.ok === '1';
+    if (!ok) b.classList.add('wrong');
+
+    const x = session.order[session.quizIdx];
+    const prev = session.results[x.k];
+    session.results[x.k] = (prev === undefined ? true : prev) && ok;
+
+    const fb = $('feedback');
+    if (ok) { fb.textContent = '정답입니다!'; fb.className = 'feedback good'; }
+    else {
+      const ans = session.step === 0 ? x.ko : readingOf(x).val;
+      fb.textContent = `오답입니다. 정답: ${ans}`;
+      fb.className = 'feedback bad';
+    }
+    const last = session.step === 1 && session.quizIdx === session.order.length - 1;
+    $('quizNext').textContent = last ? '결과 보기' : '다음';
+    $('quizNext').classList.remove('hidden');
+  });
+
+  $('quizNext').addEventListener('click', () => {
+    if (session.step === 0) session.step = 1;
+    else {
+      session.step = 0;
+      session.quizIdx++;
+      if (session.quizIdx >= session.order.length) return finishQuiz();
+    }
+    renderQuiz();
+  });
+
+  // ---------- 결과 ----------
+  function finishQuiz() {
+    const { set, results } = session;
+    const wrong = [];
+    for (const x of set) {
+      const ok = results[x.k];
+      const s = store.cards[x.k] || { c: 0, w: 0, miss: false };
+      if (ok) { s.c++; s.miss = false; } else { s.w++; s.miss = true; wrong.push(x); }
+      store.cards[x.k] = s;
+    }
+    saveStore();
+    session.wrong = wrong;
+
+    const right = set.length - wrong.length;
+    $('resultScore').textContent = `${right} / ${set.length}`;
+    $('resultSub').textContent = wrong.length ? '뜻과 읽기를 모두 맞혀야 정답으로 기록됩니다.' : '모두 맞혔습니다!';
+    $('wrongTitle').classList.toggle('hidden', !wrong.length);
+    $('wrongList').innerHTML = wrong.map(x => `
+      <div class="item">
+        <div class="k">${x.k}</div>
+        <div class="d"><b>${x.ko}</b> · ${x.en}<br>
+          <span class="jp">음 ${x.on || '-'} / 훈 ${x.kun || '-'}</span></div>
+      </div>`).join('');
+    $('retryWrongBtn').classList.toggle('hidden', !wrong.length);
+    $('nextSetBtn').textContent = session.mode === 'review' ? '복습 계속하기' : '다음 세트';
+    show('result');
+  }
+
+  $('retryWrongBtn').addEventListener('click', () => startSession(session.wrong, 'review'));
+  $('nextSetBtn').addEventListener('click', () => {
+    if (session.mode === 'review') {
+      const set = pickReviewSet();
+      if (!set.length) { alert('복습할 한자가 없습니다.'); session = null; renderHome(); show('home'); return; }
+      startSession(set, 'review');
+    } else startSession(pickNewSet(), 'new');
+  });
+
+  renderHome();
+</script>
+</body>
+</html>
