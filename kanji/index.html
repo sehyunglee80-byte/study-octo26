@@ -22,7 +22,7 @@
     --bad-bg: #f8e3e1;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root:not([data-theme="light"]) { color-scheme: dark;
       --bg: #1a1917;
       --card: #252320;
       --ink: #f1ede6;
@@ -35,6 +35,19 @@
       --bad: #ef7b72;
       --bad-bg: #3d2523;
     }
+  }
+  :root[data-theme="dark"] { color-scheme: dark;
+    --bg: #1a1917;
+    --card: #252320;
+    --ink: #f1ede6;
+    --muted: #a39d93;
+    --line: #3a3732;
+    --accent: #e0574d;
+    --accent-ink: #1a1917;
+    --good: #6cc48e;
+    --good-bg: #20352a;
+    --bad: #ef7b72;
+    --bad-bg: #3d2523;
   }
   * { box-sizing: border-box; }
   body {
@@ -117,6 +130,8 @@
   .item .d { font-size: .88rem; }
   .item .d .jp { color: var(--muted); }
   .empty { color: var(--muted); font-size: .9rem; }
+  .sync { margin: 12px 0 0; font-size: .8rem; color: var(--muted); text-align: center; }
+  .sync.on { color: var(--good); }
   footer { margin-top: 32px; color: var(--muted); font-size: .72rem; }
   footer a { color: inherit; }
 </style>
@@ -145,6 +160,7 @@
     <button class="btn" id="startBtn">학습 시작</button>
     <button class="btn ghost" id="reviewBtn">틀린 한자 복습</button>
     <button class="btn ghost" id="resetBtn">이 학년 기록 초기화</button>
+    <p class="sync" id="syncStatus">이 기기에만 저장됩니다.</p>
   </section>
 
   <!-- 학습 -->
@@ -220,12 +236,77 @@
       const s = JSON.parse(localStorage.getItem(STORE_KEY));
       if (s && s.cards) return s;
     } catch (e) {}
-    return { settings: { grade: 1, size: 10 }, cards: {} };
+    return { settings: { grade: 1, size: 10 }, cards: {}, updatedAt: 0 };
   }
-  function saveStore() {
+  function saveLocal() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
   }
-  const store = loadStore();
+  function saveStore() {
+    store.updatedAt = Date.now();
+    saveLocal();
+    pushRemote();
+  }
+  let store = loadStore();
+  store.updatedAt = store.updatedAt || 0;
+
+  // ---------- 서버 동기화 ----------
+  // 로그인한 계정별 비공개 문서(data/users/<id>/progress)에 기록을 저장해
+  // 다른 기기·브라우저에서도 같은 기록을 이어서 씁니다. 서버를 쓸 수 없으면 이 기기에만 저장합니다.
+  let remoteRef = null;
+  let pushing = false, pushAgain = false;
+
+  function setSync(text, on) {
+    const el = $('syncStatus');
+    el.textContent = text;
+    el.classList.toggle('on', !!on);
+  }
+
+  async function pushRemote() {
+    if (!remoteRef) return;
+    if (pushing) { pushAgain = true; return; }
+    pushing = true;
+    try {
+      do {
+        pushAgain = false;
+        await remoteRef.set(JSON.parse(JSON.stringify(store)));
+      } while (pushAgain);
+      setSync('계정에 저장됨 · 다른 기기에서도 이어서 학습할 수 있습니다.', true);
+    } catch (e) {
+      setSync('서버 저장에 실패했습니다. 이 기기에는 저장되어 있습니다.');
+    } finally {
+      pushing = false;
+    }
+  }
+
+  function applyRemote(d) {
+    store = {
+      settings: Object.assign({ grade: 1, size: 10 }, d.settings),
+      cards: d.cards || {},
+      updatedAt: d.updatedAt || 0,
+    };
+    saveLocal();
+    if (!$('home').classList.contains('hidden')) renderHome();
+  }
+
+  async function initSync() {
+    if (!window.claude || !window.claude.use) return;
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    const id = user ? await user.id() : null;
+    if (!db || !id) { setSync('로그인하지 않아 이 기기에만 저장됩니다.'); return; }
+    remoteRef = db.doc('data/users/' + id + '/progress');
+    setSync('계정 기록을 불러오는 중...');
+    remoteRef.onSnapshot(snap => {
+      if (snap.metadata.hasPendingWrites) return;
+      const d = snap.exists ? snap.data() : null;
+      const remoteAt = d ? d.updatedAt || 0 : -1;
+      if (remoteAt > store.updatedAt) applyRemote(d);
+      else if (remoteAt < store.updatedAt) { pushRemote(); return; }
+      setSync('계정에 저장됨 · 다른 기기에서도 이어서 학습할 수 있습니다.', true);
+    }, () => {
+      remoteRef = null;
+      setSync('서버에 연결할 수 없어 이 기기에만 저장됩니다.');
+    });
+  }
 
   const $ = id => document.getElementById(id);
   const shuffle = a => {
@@ -270,6 +351,7 @@
     $('stWrong').textContent = miss;
     $('stBar').style.width = (learned / list.length * 100) + '%';
     $('reviewBtn').disabled = miss === 0;
+    if (!resetArmed) $('resetBtn').textContent = '이 학년 기록 초기화';
     $('startBtn').textContent = learned === list.length ? '학습 시작 (전체 학습 완료, 무작위 출제)' : '학습 시작';
   }
 
@@ -305,15 +387,21 @@
     const set = pickReviewSet();
     if (set.length) startSession(set, 'review');
   });
+  let resetArmed = false;
   $('resetBtn').addEventListener('click', () => {
     const g = store.settings.grade;
-    if (!confirm(`${g}학년 학습 기록을 모두 지울까요?`)) return;
+    if (!resetArmed) {
+      resetArmed = true;
+      $('resetBtn').textContent = `한 번 더 누르면 ${g}학년 기록이 삭제됩니다`;
+      setTimeout(() => { resetArmed = false; renderHome(); }, 4000);
+      return;
+    }
+    resetArmed = false;
     for (const x of gradeKanji(g)) delete store.cards[x.k];
     saveStore(); renderHome();
   });
   document.querySelectorAll('[data-home]').forEach(b => b.addEventListener('click', () => {
     if (!$('home').classList.contains('hidden')) return;
-    if (session && !$('quiz').classList.contains('hidden') && !confirm('퀴즈를 중단하고 처음으로 돌아갈까요?')) return;
     session = null; renderHome(); show('home');
   }));
 
@@ -466,12 +554,13 @@
   $('nextSetBtn').addEventListener('click', () => {
     if (session.mode === 'review') {
       const set = pickReviewSet();
-      if (!set.length) { alert('복습할 한자가 없습니다.'); session = null; renderHome(); show('home'); return; }
+      if (!set.length) { session = null; renderHome(); show('home'); return; }
       startSession(set, 'review');
     } else startSession(pickNewSet(), 'new');
   });
 
   renderHome();
+  initSync();
 </script>
 </body>
 </html>
