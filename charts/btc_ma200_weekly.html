@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BTC 200일선 매매</title>
+<title>BTC 200일선 · 주 1회 판단 매매 기록</title>
 <style>
 :root {
   color-scheme: light;
@@ -169,6 +169,12 @@ function chart(svgId, tipId, opts) {
     s.v.forEach((v, i) => { if (v == null) return; d += (d ? "L" : "M") + X(T[i]).toFixed(1) + "," + Y(v).toFixed(1); });
     el("path", {d, fill: "none", stroke: s.c, "stroke-width": 2, "stroke-linejoin": "round"}, svg);
   }
+  // 버퍼 경계선 (얇은 점선, 호버 대상 아님)
+  for (const s of (opts.extra || [])) {
+    let d = "";
+    s.v.forEach((v, i) => { if (v == null) return; d += (d ? "L" : "M") + X(T[i]).toFixed(1) + "," + Y(v).toFixed(1); });
+    el("path", {d, fill: "none", stroke: "var(--s2)", "stroke-width": 1, "stroke-dasharray": "4 3", opacity: 0.7}, svg);
+  }
   // 매매 마커
   if (opts.marks) {
     for (const t of D.trades) {
@@ -208,9 +214,10 @@ const state = i => D.inv[i] ? "보유" : "현금";
 chart("p1", "t1", {
   h: 380, log: true, bands: true, marks: true,
   series: [{v: D.close, c: "var(--s1)"}, {v: D.ma, c: "var(--s2)"}],
+  extra: D.upper ? [{v: D.upper}, {v: D.lower}] : [],
   ticks: [2e7, 3e7, 5e7, 7e7, 1e8, 1.5e8, 2e8],
   tickFmt: v => (v / 1e6).toLocaleString("ko-KR") + "백만",
-  tipRows: i => [["BTC 종가", fmtW(D.close[i]) + "원"], ["200일선", fmtW(D.ma[i]) + "원"], ["상태", state(i)]],
+  tipRows: i => [["BTC 종가", fmtW(D.close[i]) + "원"], ["200일선", fmtW(D.ma[i]) + "원"]].concat(D.upper ? [["매수선 / 매도선", fmtW(D.upper[i]) + " / " + fmtW(D.lower[i])]] : []).concat([["상태", state(i)]]),
 });
 chart("p2", "t2", {
   h: 280, log: false,

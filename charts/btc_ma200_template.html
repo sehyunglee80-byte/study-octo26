@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BTC 200일선 매매</title>
+<title>/*TITLE*/</title>
 <style>
 :root {
   color-scheme: light;
@@ -69,8 +69,8 @@ th { color: var(--ink-2); font-weight: 500; }
 </head>
 <body>
 <main>
-  <h1>BTC 200일선 · 주 1회 판단 매매 기록</h1>
-  <p class="sub">2022-01-03부터 2026-10-07까지 · 매주 월요일 09:00, 전일 종가가 200일선 위면 보유, 아래면 현금 · 수수료 0.05%와 슬리피지 0.1% 반영 · 원금 1억 원 기준</p>
+  <h1>/*TITLE*/</h1>
+  <p class="sub">/*SUB*/</p>
   <div class="kpis" id="kpis"></div>
 
   <div class="card" id="c1">
@@ -78,7 +78,7 @@ th { color: var(--ink-2); font-weight: 500; }
     <div class="legend">
       <span><i class="sw" style="background:var(--s1)"></i>BTC 종가</span>
       <span><i class="sw" style="background:var(--s2)"></i>200일 이동평균</span>
-      <span><i class="swb"></i>보유 구간</span>
+/*BANDLEGEND*/      <span><i class="swb"></i>보유 구간</span>
       <span><b class="buy">▲</b> 매수</span>
       <span><b class="sell">▼</b> 매도</span>
     </div>
@@ -89,7 +89,7 @@ th { color: var(--ink-2); font-weight: 500; }
   <div class="card" id="c2">
     <h2>자산 변화 (원금 1억 원)</h2>
     <div class="legend">
-      <span><i class="sw" style="background:var(--s1)"></i>200일선 주 1회 전략</span>
+      <span><i class="sw" style="background:var(--s1)"></i>/*STRAT*/</span>
       <span><i class="sw" style="background:var(--s2)"></i>BTC 단순 보유</span>
     </div>
     <svg id="p2"></svg>
@@ -98,7 +98,7 @@ th { color: var(--ink-2); font-weight: 500; }
 
   <div class="card">
     <h2>매매 내역</h2>
-    <p class="note">체결가는 해당 월요일 09:00 업비트 시가. 수익률은 매수에서 매도까지, 왕복 비용 반영.</p>
+    <p class="note">/*NOTE*/</p>
     <div class="tbl"><table id="tbl"></table></div>
   </div>
 </main>
@@ -169,6 +169,12 @@ function chart(svgId, tipId, opts) {
     s.v.forEach((v, i) => { if (v == null) return; d += (d ? "L" : "M") + X(T[i]).toFixed(1) + "," + Y(v).toFixed(1); });
     el("path", {d, fill: "none", stroke: s.c, "stroke-width": 2, "stroke-linejoin": "round"}, svg);
   }
+  // 버퍼 경계선 (얇은 점선, 호버 대상 아님)
+  for (const s of (opts.extra || [])) {
+    let d = "";
+    s.v.forEach((v, i) => { if (v == null) return; d += (d ? "L" : "M") + X(T[i]).toFixed(1) + "," + Y(v).toFixed(1); });
+    el("path", {d, fill: "none", stroke: "var(--s2)", "stroke-width": 1, "stroke-dasharray": "4 3", opacity: 0.7}, svg);
+  }
   // 매매 마커
   if (opts.marks) {
     for (const t of D.trades) {
@@ -208,9 +214,10 @@ const state = i => D.inv[i] ? "보유" : "현금";
 chart("p1", "t1", {
   h: 380, log: true, bands: true, marks: true,
   series: [{v: D.close, c: "var(--s1)"}, {v: D.ma, c: "var(--s2)"}],
+  extra: D.upper ? [{v: D.upper}, {v: D.lower}] : [],
   ticks: [2e7, 3e7, 5e7, 7e7, 1e8, 1.5e8, 2e8],
   tickFmt: v => (v / 1e6).toLocaleString("ko-KR") + "백만",
-  tipRows: i => [["BTC 종가", fmtW(D.close[i]) + "원"], ["200일선", fmtW(D.ma[i]) + "원"], ["상태", state(i)]],
+  tipRows: i => [["BTC 종가", fmtW(D.close[i]) + "원"], ["200일선", fmtW(D.ma[i]) + "원"]].concat(D.upper ? [["매수선 / 매도선", fmtW(D.upper[i]) + " / " + fmtW(D.lower[i])]] : []).concat([["상태", state(i)]]),
 });
 chart("p2", "t2", {
   h: 280, log: false,
