@@ -220,7 +220,7 @@ chart("p1", "t1", {
   extra: D.upper ? [{v: D.upper}, {v: D.lower}] : [],
   ticks: niceTicks(Math.min(...D.close, ...D.ma.filter(v => v != null)), Math.max(...D.close)),
   tickFmt: v => D.unit === "$" ? "$" + v.toLocaleString("en-US") : v.toLocaleString("ko-KR"),
-  tipRows: i => [["종가", fmtPx(D.close[i])], ["200일선", fmtPx(D.ma[i])]].concat([["상태", state(i)]]),
+  tipRows: i => [["종가", fmtPx(D.close[i])], ["200일선", fmtPx(D.ma[i])]].concat(D.upper ? [["매수선 / 매도선", fmtPx(D.upper[i]) + " / " + fmtPx(D.lower[i])]] : []).concat([["상태", state(i)]]),
 });
 chart("p2", "t2", {
   h: 280, log: false,

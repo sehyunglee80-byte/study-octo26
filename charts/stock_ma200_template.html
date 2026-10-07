@@ -78,7 +78,7 @@ th { color: var(--ink-2); font-weight: 500; }
     <div class="legend">
       <span><i class="sw" style="background:var(--s1)"></i>/*ASSET*/ 종가</span>
       <span><i class="sw" style="background:var(--s2)"></i>200일 이동평균</span>
-      <span><i class="swb"></i>보유 구간</span>
+/*BANDLEGEND*/      <span><i class="swb"></i>보유 구간</span>
       <span><b class="buy">▲</b> 매수</span>
       <span><b class="sell">▼</b> 매도</span>
     </div>
@@ -220,7 +220,7 @@ chart("p1", "t1", {
   extra: D.upper ? [{v: D.upper}, {v: D.lower}] : [],
   ticks: niceTicks(Math.min(...D.close, ...D.ma.filter(v => v != null)), Math.max(...D.close)),
   tickFmt: v => D.unit === "$" ? "$" + v.toLocaleString("en-US") : v.toLocaleString("ko-KR"),
-  tipRows: i => [["종가", fmtPx(D.close[i])], ["200일선", fmtPx(D.ma[i])]].concat([["상태", state(i)]]),
+  tipRows: i => [["종가", fmtPx(D.close[i])], ["200일선", fmtPx(D.ma[i])]].concat(D.upper ? [["매수선 / 매도선", fmtPx(D.upper[i]) + " / " + fmtPx(D.lower[i])]] : []).concat([["상태", state(i)]]),
 });
 chart("p2", "t2", {
   h: 280, log: false,
