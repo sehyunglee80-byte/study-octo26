@@ -4,7 +4,8 @@
   - 유니버스: 전년도 말 글로벌 시총 순위 기준, 업비트 원화마켓에 있는 알트 상위 20개
               (BTC, 스테이블코인, 래핑 토큰 제외 / 업비트 미상장 코인은 건너뜀)
               해당 연도 동안 목록 고정, 상장 후 60일 미만 코인은 제외
-  - BTC 필터: 120일 이동평균 고정
+  - BTC 필터: 50, 120, 200일 이동평균 비교
+  - 기간: 2022-01-01부터 (2021년은 알트 불장 아웃라이어라 제외)
   - 나머지 파라미터(룩백, 손절, 익절, 플러스만 편입)는 기존 그리드 그대로
 
 먼저 python backtest_momentum.py 를 실행해 data/upbit_daily.csv 를 만들어 두어야 합니다.
@@ -12,6 +13,7 @@
 """
 
 import os
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -35,7 +37,8 @@ YEAR_END_TOP = {
     2025: ["XRP", "SOL", "TRX", "DOGE", "ADA", "BCH", "LINK", "XLM", "SUI", "AVAX",
            "HBAR", "SHIB", "CRO", "DOT", "UNI", "MNT", "WLFI", "NEAR", "AAVE", "ENA"],
 }
-BTC_MA = 120
+BTC_MAS = [50, 120, 200]
+START = date(2022, 1, 1)
 
 
 def largecap_universe(P, alts):
@@ -53,15 +56,16 @@ def largecap_universe(P, alts):
 
 
 def main():
-    bm.BTC_FILTERS = [BTC_MA]
-    bm.ORIGINAL = dict(lookback="7", btc_ma=BTC_MA, sl=0.10, tp=0.10, abs_mom=False)
+    bm.BTC_FILTERS = BTC_MAS
+    bm.TRADE_START = START
+    bm.ORIGINAL = dict(lookback="7", btc_ma=120, sl=0.10, tp=0.10, abs_mom=False)
 
     raw = pd.read_csv(os.path.join(bm.DATA_DIR, "upbit_daily.csv"), parse_dates=["date"])
     P = bm.build_panels(raw)
     alts = [s for s in P["close"].columns if s != "BTC" and s not in bm.STABLES]
     elig = largecap_universe(P, alts)
 
-    label = f"연말 시총 상위 20 대형 알트 유니버스 (BTC MA{BTC_MA} 고정)"
+    label = f"연말 시총 상위 20 대형 알트 유니버스 (BTC MA {BTC_MAS} 비교)"
     grid, curves, sim_dates, bench, split = bm.run_grid(P, elig, bm.TRADE_START, label)
 
     rows = []
@@ -82,6 +86,7 @@ def main():
     text = "\n".join([
         "유니버스: 전년도 말 시총 순위 기준 업비트 상장 알트 상위 20 (목록은 backtest_largecap.py 참고)",
         "주의: 목록은 기억 기반 근사치, 상장폐지 코인(LUNA 등)은 데이터에 없음(생존 편향)",
+        f"기간: {START} 이후 (2021년 제외)",
         "원안 행은 '룩백 7일, 손절 10%, 익절 10%'에 BTC MA120 필터를 적용한 것\n",
         bm.summarize(grid, curves, sim_dates, bench, split, label),
     ])
