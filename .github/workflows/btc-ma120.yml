@@ -37,12 +37,18 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python btc-ma120/check.py
 
-      - name: Save state when it changes
+      - name: Save state, or keep the schedule alive
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain btc-ma120/state.json)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
             git add btc-ma120/state.json
             git commit -m "Update BTC MA120 state"
+            git push
+          elif [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -gt $(( 30 * 86400 )) ]; then
+            # 공개 저장소는 60일간 커밋이 없으면 예약 실행이 멈추므로, 30일 넘게 조용하면 기록을 남긴다
+            date -u +%Y-%m-%dT%H:%M:%SZ > btc-ma120/keepalive.txt
+            git add btc-ma120/keepalive.txt
+            git commit -m "Keep BTC MA120 schedule active"
             git push
           fi
