@@ -18,7 +18,7 @@
 3. 저장소 Settings → Secrets and variables → Actions에 Secret 두 개를 등록합니다.
    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 4. (선택) 같은 화면 Variables 탭에서 `BTC_SOURCE`(`upbit`/`binance`), `BTC_MA_DAYS`(기본 120), `BTC_BAND_PCT`(기본 0)를 바꿀 수 있습니다.
-5. 워크플로는 기본 브랜치(main)에 있어야 예약 실행됩니다. Actions 탭에서 `BTC MA120 cross check` → Run workflow → `notify_status` 체크로 텔레그램 연결을 테스트할 수 있습니다.
+5. 워크플로는 저장소의 기본 브랜치(현재 `claude/nifty-darwin-5pafy8`)에 있어야 예약 실행됩니다. Actions 탭에서 `BTC MA120 cross check` → Run workflow → `notify_status` 체크로 텔레그램 연결을 테스트할 수 있습니다.
 
 참고: 위치가 바뀔 때마다 `btc-ma120/state.json`이 자동 커밋됩니다. GitHub은 60일 동안 저장소 활동이 없으면 예약 실행을 멈추므로, 그 경우 Actions 탭에서 다시 켜 주세요.
 
