@@ -1,8 +1,10 @@
 name: BTC MA120 cross check
 
 on:
-  schedule:
-    - cron: "7 * * * *" # 매시 7분(UTC). GitHub 사정에 따라 몇 분 늦게 실행될 수 있음
+  # 예약 실행은 꺼 두었다. 전략을 200일선 주간 신호(btc-ma200-weekly)로 바꿨기 때문.
+  # 다시 켜려면 아래 주석을 푼다.
+  # schedule:
+  #   - cron: "7 * * * *" # 매시 7분(UTC). GitHub 사정에 따라 몇 분 늦게 실행될 수 있음
   workflow_dispatch:
     inputs:
       notify_status:
