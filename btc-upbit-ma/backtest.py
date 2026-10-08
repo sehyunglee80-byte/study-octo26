@@ -334,6 +334,67 @@ def main():
             cells.append(pct(x["total"], 0))
         L.append(f"| {y}{'(진행 중)' if y == d[-1].year else ''} | " + " | ".join(cells) + " |")
 
+    # 사고팔기 반복을 줄이는 장치 비교 (2022년~, 매일 '둘 다 위')
+    k, d, c = window(date(2022, 1, 3))
+    m120, m200 = MA[120][k:], MA[200][k:]
+
+    def filtered(band_in, band_out, n_in, n_out):
+        """band: 이평선 대비 여유 폭(0.01 = 1%), n: 조건이 며칠 연속이어야 바꾸는지."""
+        out, state, cnt = [], 0, 0
+        for i in range(len(c)):
+            if state == 0:
+                ok = c[i] > m120[i] * (1 + band_in) and c[i] > m200[i] * (1 + band_in)
+            else:
+                ok = c[i] <= m120[i] * (1 - band_out) or c[i] <= m200[i] * (1 - band_out)
+            cnt = cnt + 1 if ok else 0
+            if cnt >= (n_in if state == 0 else n_out):
+                state, cnt = 1 - state, 0
+            out.append(state)
+        return out
+
+    def trade_list(p):
+        res, entry = [], None
+        for i in range(len(p)):
+            prev = p[i - 1] if i else 0
+            if p[i] and not prev:
+                entry = i
+            if prev and not p[i]:
+                res.append(((d[i] - d[entry]).days, c[i] / c[entry] * (1 - FEE) ** 2 - 1))
+        return res
+
+    variants = [
+        ("기본 (여유 폭 없음, 당일)", filtered(0, 0, 1, 1)),
+        ("여유 폭 0.5% (사고팔 때 모두)", filtered(0.005, 0.005, 1, 1)),
+        ("여유 폭 1%", filtered(0.01, 0.01, 1, 1)),
+        ("여유 폭 2%", filtered(0.02, 0.02, 1, 1)),
+        ("여유 폭 3%", filtered(0.03, 0.03, 1, 1)),
+        ("여유 폭 1% (살 때만)", filtered(0.01, 0, 1, 1)),
+        ("여유 폭 2% (살 때만)", filtered(0.02, 0, 1, 1)),
+        ("여유 폭 2% (팔 때만)", filtered(0, 0.02, 1, 1)),
+        ("이틀 연속 (사고팔 때 모두)", filtered(0, 0, 2, 2)),
+        ("사흘 연속 (사고팔 때 모두)", filtered(0, 0, 3, 3)),
+        ("이틀 연속 (살 때만)", filtered(0, 0, 2, 1)),
+        ("이틀 연속 (팔 때만)", filtered(0, 0, 1, 2)),
+        ("여유 폭 1% + 이틀 연속", filtered(0.01, 0.01, 2, 2)),
+        ("참고: 주 1회 200일선", weekly(d, above(200, k))),
+    ]
+    L.append("\n## 사고팔기 반복 줄이기: 여유 폭 vs 연속 일수 (2022-01-03 → 최근, 매일 '둘 다 위')\n")
+    L.append("여유 폭: 살 때는 종가가 두 이평선보다 X% 이상 위, 팔 때는 어느 한 이평선보다 X% 이상 아래여야 바꿉니다. "
+             "연속: 조건이 N일 연속 맞아야 바꿉니다. 수수료 반영.\n")
+    L.append("| 방식 | 누적 | 최대낙폭 | 가장 긴 고점 회복 | 매매 | 승률 | 7일 내 단기 매매 (합계) | 현재 |\n| --- | --- | --- | --- | --- | --- | --- | --- |")
+    for label, p in variants:
+        x = stats(d, c, p)
+        eq = equity(c, p)
+        eps, _ = drawdowns(d, eq)
+        longest = max(((d[e[2]] if e[2] is not None else d[-1]) - d[e[0]]).days for e in eps) if eps else 0
+        tl = trade_list(p)
+        sh = [r for n, r in tl if n <= 7]
+        shs = 1.0
+        for r in sh:
+            shs *= 1 + r
+        L.append(f"| {label} | {pct(x['total'], 0)} | {pct(x['mdd'])} | {longest}일 | {x['trades']} | {x['win'] * 100:.0f}% | "
+                 f"{len(sh)}번 ({pct(shs - 1)}) | {'보유' if p[-1] else '현금'} |")
+
     # 차트용 데이터: 2022-01-03부터, 매일 '둘 다 위' 전략
     k, d, c = window(date(2022, 1, 3))
     both = [a & b for a, b in zip(above(120, k), above(200, k))]
