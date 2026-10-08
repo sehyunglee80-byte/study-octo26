@@ -1,0 +1,32 @@
+name: MSTR MA analysis
+
+on:
+  workflow_dispatch:
+  push:
+    # 분석은 작업 브랜치에서만 자동 실행한다. 기본 브랜치에서는 Actions 탭에서 수동 실행.
+    branches-ignore:
+      - claude/nifty-darwin-5pafy8
+    paths:
+      - "mstr-ma/**"
+      - ".github/workflows/mstr-ma-analysis.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Analyze
+        run: python mstr-ma/analyze.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mstr-ma-analysis
+          path: mstr-ma/analysis.md

@@ -1,0 +1,42 @@
+name: BTC Upbit MA backtest
+
+on:
+  workflow_dispatch:
+  push:
+    # 분석은 작업 브랜치에서만 자동 실행한다. 기본 브랜치에서는 Actions 탭에서 수동 실행.
+    branches-ignore:
+      - claude/nifty-darwin-5pafy8
+    paths:
+      - "btc-upbit-ma/**"
+      - ".github/workflows/btc-upbit-ma-backtest.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Analyze
+        run: python btc-upbit-ma/backtest.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: btc-upbit-ma-backtest
+          path: btc-upbit-ma/analysis.md
+
+      - name: Save chart data
+        run: |
+          if [ -n "$(git status --porcelain btc-upbit-ma/chart-data.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+            git add btc-upbit-ma/chart-data.json
+            git commit -m "Update BTC Upbit MA chart data"
+            git push
+          fi
