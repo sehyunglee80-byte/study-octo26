@@ -366,7 +366,9 @@ def main():
         ("기본 (여유 폭 없음, 당일)", filtered(0, 0, 1, 1)),
         ("여유 폭 0.5% (사고팔 때 모두)", filtered(0.005, 0.005, 1, 1)),
         ("여유 폭 1%", filtered(0.01, 0.01, 1, 1)),
+        ("여유 폭 1.5%", filtered(0.015, 0.015, 1, 1)),
         ("여유 폭 2%", filtered(0.02, 0.02, 1, 1)),
+        ("여유 폭 2.5%", filtered(0.025, 0.025, 1, 1)),
         ("여유 폭 3%", filtered(0.03, 0.03, 1, 1)),
         ("여유 폭 1% (살 때만)", filtered(0.01, 0, 1, 1)),
         ("여유 폭 2% (살 때만)", filtered(0.02, 0, 1, 1)),
@@ -394,6 +396,24 @@ def main():
             shs *= 1 + r
         L.append(f"| {label} | {pct(x['total'], 0)} | {pct(x['mdd'])} | {longest}일 | {x['trades']} | {x['win'] * 100:.0f}% | "
                  f"{len(sh)}번 ({pct(shs - 1)}) | {'보유' if p[-1] else '현금'} |")
+
+    # 여유 폭 촘촘히: 2%가 우연인지 확인
+    L.append("\n## 여유 폭 촘촘히 (0.25% 간격, 사고팔 때 모두)\n")
+    L.append("시작일을 바꿔도 같은 경향인지 함께 봅니다. 칸 = 누적 / 최대낙폭 / 매매 횟수\n")
+    shift = [date(2022, 1, 3), date(2022, 7, 1), date(2023, 1, 2), date(2023, 7, 3)]
+    L.append("| 여유 폭 | " + " | ".join(f"{x} 시작" for x in shift) + " |\n|" + " --- |" * (len(shift) + 1))
+    full_pos = {}
+    for b in [i * 0.0025 for i in range(17)]:
+        full_pos[b] = filtered(b, b, 1, 1)
+    for b, p in full_pos.items():
+        cells = []
+        for st in shift:
+            j = next(i for i, x in enumerate(d) if x >= st)
+            # 필터 상태는 2022-01-03부터 이어 오고, 시작일에 보유 상태면 그날 종가에 산 것으로 본다
+            pp = p[j:]
+            x = stats(d[j:], c[j:], pp)
+            cells.append(f"{pct(x['total'], 0)} / {pct(x['mdd'], 0)} / {x['trades']}")
+        L.append(f"| {b * 100:.2f}% | " + " | ".join(cells) + " |")
 
     # 차트용 데이터: 2022-01-03부터, 매일 '둘 다 위' 전략
     k, d, c = window(date(2022, 1, 3))
