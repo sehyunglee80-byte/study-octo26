@@ -87,6 +87,36 @@ def stats(dates, closes, pos, per_year):
     }
 
 
+def weekly(dates, sig):
+    """주 1회 판단: 그 주 마지막 거래일 종가로 정한 포지션을 다음 주 마지막 거래일까지 유지한다.
+    BTC는 일요일, 미국 주식은 보통 금요일이 마지막 거래일이다."""
+    out, cur = [], 0
+    for i, d in enumerate(dates):
+        if i == len(dates) - 1 or dates[i + 1].isocalendar()[:2] != d.isocalendar()[:2]:
+            cur = sig[i]
+        out.append(cur)
+    return out
+
+
+def summary(series, per_year, starts, lines, title):
+    full_d = [d for d, _ in series]
+    full_c = [c for _, c in series]
+    m120, m200 = sma(full_c, 120), sma(full_c, 200)
+    lines.append(f"\n### {title}\n")
+    lines.append("| 시작일 | 판단 | 조건 | 누적 | 연환산 | 최대낙폭 | 매매 |\n| --- | --- | --- | --- | --- | --- | --- |")
+    for st in starts:
+        k = next(i for i, d in enumerate(full_d) if d >= st)
+        d, c, a, b = full_d[k:], full_c[k:], m120[k:], m200[k:]
+        rows = [("-", "계속 보유", [1] * len(c))]
+        for label, ma in (("종가 > 120일선", a), ("종가 > 200일선", b)):
+            sig = [int(c[i] > ma[i]) for i in range(len(c))]
+            rows.append(("매일", label, sig))
+            rows.append(("주 1회", label, weekly(d, sig)))
+        for freq, label, p in rows:
+            x = stats(d, c, p, per_year)
+            lines.append(f"| {d[0]} | {freq} | {label} | {pct(x['total'])} | {pct(x['cagr'])} | {pct(x['mdd'])} | {x['trades'] if freq != '-' else '-'} |")
+
+
 def crosses(dates, a, b):
     """a가 b를 위로(+1)/아래로(-1) 넘은 날 목록."""
     ev = []
@@ -204,6 +234,11 @@ def main():
 
     analyze("MSTR (스트래터지)", mstr, 252, lines, extra)
     analyze("BTC-USD (비교용)", btc, 365, lines)
+
+    lines.append("\n## 기간·판단 주기별 비교\n")
+    starts = [START, date(2022, 1, 3)]
+    summary(mstr, 252, starts, lines, "MSTR")
+    summary(btc, 365, starts, lines, "BTC-USD")
 
     pairs = matched_returns(mstr, btc)
     lines.append("\n## MSTR과 비트코인의 관계\n")
