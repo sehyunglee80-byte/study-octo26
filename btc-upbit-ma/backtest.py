@@ -199,6 +199,46 @@ def main():
                 cells.append(f"{pct(x['total'], 0)} / {pct(x['mdd'], 0)} / {x['trades']}")
         L.append(f"| {n}일 | " + " | ".join(cells) + " |")
 
+    # 두 전략이 갈리는 구간: 200일선 위 & 120일선 아래 (매일 판단)
+    L.append("\n## '200일선만 위'와 '둘 다 위'가 갈리는 구간 (매일 판단)\n")
+    L.append("종가가 200일선 위, 120일선 아래인 날에만 두 전략이 다릅니다(200일선만 위 = 보유, 둘 다 위 = 현금). "
+             "구간 수익률은 그 기간 BTC 등락이며, 플러스면 '200일선만 위'가 유리했던 구간입니다.\n")
+    k = first_valid
+    eps, i = [], k
+    while i < len(C) - 1:
+        if MA[200][i] < C[i] <= MA[120][i]:
+            j, r = i, 1.0
+            while j < len(C) - 1 and MA[200][j] < C[j] <= MA[120][j]:
+                r *= C[j + 1] / C[j]
+                j += 1
+            end = "진행 중" if j == len(C) - 1 and MA[200][j] < C[j] <= MA[120][j] else (
+                "120일선 위로 복귀" if C[j] > MA[120][j] else "200일선 아래로 이탈")
+            eps.append((D[i], D[j], j - i, r - 1, end))
+            i = j
+        else:
+            i += 1
+    L.append("| 시작(종가 기준) | 종료 | 일수 | 구간 BTC 등락 | 끝난 방식 |\n| --- | --- | --- | --- | --- |")
+    for a, b, n, r, e in eps:
+        if n >= 3 or abs(r) >= 0.03:
+            L.append(f"| {a} | {b} | {n} | {pct(r)} | {e} |")
+    up = [x for x in eps if x[4] == "120일선 위로 복귀"]
+    dn = [x for x in eps if x[4] == "200일선 아래로 이탈"]
+    tot = 1.0
+    for x in eps:
+        tot *= 1 + x[3]
+    days = sum(x[2] for x in eps)
+    L.append(f"\n- 전체 {len(eps)}구간, {days}일({days / (len(C) - 1 - k) * 100:.1f}%). 3일 미만이면서 등락 3% 미만인 짧은 구간은 표에서 뺐습니다.")
+    L.append(f"- 120일선 위로 복귀하며 끝남 {len(up)}회(평균 {pct(sum(x[3] for x in up) / len(up) if up else float('nan'))}), "
+             f"200일선 아래로 이탈하며 끝남 {len(dn)}회(평균 {pct(sum(x[3] for x in dn) / len(dn) if dn else float('nan'))})")
+    L.append(f"- 이 구간들을 모두 보유했을 때 누적 {pct(tot - 1)} (플러스면 200일선만 위가 유리, 수수료 제외)")
+    L.append(f"- 현재: {'두 전략 같음 (120일선 < 200일선이거나 종가가 120일선 위)' if not (MA[200][-1] < C[-1] <= MA[120][-1]) else '갈리는 구간 안'}")
+    for name, start in periods:
+        sub = [x for x in eps if x[0] >= start]
+        t = 1.0
+        for x in sub:
+            t *= 1 + x[3]
+        L.append(f"  - {name}: {len(sub)}구간, 누적 {pct(t - 1)}")
+
     # 연도별 수익률
     L.append("\n## 연도별 수익률\n")
     k, d, c = window(periods[0][1])
