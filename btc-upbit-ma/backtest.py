@@ -104,6 +104,39 @@ def stats(dates, closes, pos, fee=FEE):
     }
 
 
+def equity(closes, pos, fee=FEE):
+    """stats()와 같은 규칙으로 날짜별 자산 곡선을 만든다(첫날 1.0)."""
+    eq, out, prev = 1.0, [1.0], 0
+    for i in range(len(closes) - 1):
+        if pos[i] != prev:
+            eq *= 1 - fee
+            prev = pos[i]
+        if pos[i]:
+            eq *= closes[i + 1] / closes[i]
+        out.append(eq)
+    return out
+
+
+def drawdowns(dates, eq):
+    """고점→저점→회복 구간 목록과 일별 낙폭."""
+    eps, dd, peak_i, trough_i = [], [], 0, 0
+    for i, v in enumerate(eq):
+        if v >= eq[peak_i]:
+            if trough_i > peak_i and eq[trough_i] < eq[peak_i]:
+                eps.append((peak_i, trough_i, i))
+            peak_i = trough_i = i
+        elif v < eq[trough_i]:
+            trough_i = i
+        dd.append(v / eq[peak_i] - 1)
+    if trough_i > peak_i and eq[trough_i] < eq[peak_i]:
+        eps.append((peak_i, trough_i, None))  # 아직 회복 못 함
+    return eps, dd
+
+
+def worst_window(eq, n):
+    return min(eq[i + n] / eq[i] - 1 for i in range(len(eq) - n))
+
+
 def pct(x, digits=1):
     return "-" if x is None or (isinstance(x, float) and math.isnan(x)) else f"{x * 100:+.{digits}f}%"
 
@@ -198,6 +231,48 @@ def main():
                 x = stats(d, c, p)
                 cells.append(f"{pct(x['total'], 0)} / {pct(x['mdd'], 0)} / {x['trades']}")
         L.append(f"| {n}일 | " + " | ".join(cells) + " |")
+
+    # 하락 지표 비교
+    L.append("\n## 하락 지표 비교\n")
+    L.append("수수료 반영. '고점 아래 일수'는 자산이 직전 최고치보다 낮았던 날의 비율, '손실일'은 자산이 전날보다 줄어든 날의 비율입니다.\n")
+    for name, start in periods:
+        k, d, c = window(start)
+        both = [a & b for a, b in zip(above(120, k), above(200, k))]
+        cand = {"주 1회 200일선": weekly(d, above(200, k)), "매일 둘 다 위": both, "계속 보유(참고)": [1] * len(d)}
+        rows, top = {}, {}
+        for label, p in cand.items():
+            eq = equity(c, p)
+            eps, dd = drawdowns(d, eq)
+            x = stats(d, c, p)
+            n = len(eq) - 1
+            deep = min(eps, key=lambda e: eq[e[1]] / eq[e[0]])
+            rec = lambda e: (d[e[2]] - d[e[0]]).days if e[2] is not None else (d[-1] - d[e[0]]).days
+            longest = max(eps, key=rec)
+            rows[label] = [
+                pct(x["mdd"]),
+                f"{d[deep[0]]} → {d[deep[1]]} → {d[deep[2]] if deep[2] is not None else '미회복'}",
+                f"{(d[deep[1]] - d[deep[0]]).days}일 / {f"{(d[deep[2]] - d[deep[1]]).days}일" if deep[2] is not None else "미회복"}",
+                f"{rec(longest)}일 ({d[longest[0]]}~{d[longest[2]] if longest[2] is not None else '진행 중'})",
+                f"{sum(v < 0 for v in dd) / len(dd) * 100:.0f}%",
+                f"{sum(eq[i + 1] < eq[i] for i in range(n)) / n * 100:.0f}%",
+                pct(sum(dd) / len(dd)),
+                f"{sum(eq[e[1]] / eq[e[0]] - 1 <= -0.10 for e in eps)}회 / {sum(eq[e[1]] / eq[e[0]] - 1 <= -0.20 for e in eps)}회",
+                f"{pct(worst_window(eq, 1))} / {pct(worst_window(eq, 7))} / {pct(worst_window(eq, 30))}",
+                f"{x['cagr'] / abs(x['mdd']):.2f}" if x["mdd"] else "-",
+                pct(dd[-1]),
+            ]
+            top[label] = sorted(eps, key=lambda e: eq[e[1]] / eq[e[0]])[:3], eq
+        L.append(f"\n### {name} ({d[0]} → {d[-1]})\n")
+        L.append("| 지표 | " + " | ".join(cand) + " |\n|" + " --- |" * (len(cand) + 1))
+        names = ["최대낙폭(MDD)", "MDD 고점 → 저점 → 회복", "하락 기간 / 회복 기간", "가장 긴 고점 회복 기간",
+                 "고점 아래 일수", "손실일", "평균 낙폭", "-10% 이상 / -20% 이상 하락 횟수",
+                 "최악의 1일 / 7일 / 30일", "연환산 ÷ MDD", "현재 낙폭"]
+        for j, nm in enumerate(names):
+            L.append(f"| {nm} | " + " | ".join(rows[lb][j] for lb in cand) + " |")
+        for label in list(cand)[:2]:
+            eps3, eq = top[label]
+            L.append(f"\n{label} 큰 하락 3개: " + "; ".join(
+                f"{pct(eq[e[1]] / eq[e[0]] - 1)} ({d[e[0]]}~{d[e[1]]}, 회복 {d[e[2]] if e[2] is not None else '안 됨'})" for e in eps3))
 
     # 두 전략이 갈리는 구간: 200일선 위 & 120일선 아래 (매일 판단)
     L.append("\n## '200일선만 위'와 '둘 다 위'가 갈리는 구간 (매일 판단)\n")
