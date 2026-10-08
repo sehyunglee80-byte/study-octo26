@@ -1,0 +1,29 @@
+name: BTC Upbit MA backtest
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "btc-upbit-ma/**"
+      - ".github/workflows/btc-upbit-ma-backtest.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Analyze
+        run: python btc-upbit-ma/backtest.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: btc-upbit-ma-backtest
+          path: btc-upbit-ma/analysis.md
