@@ -1,0 +1,49 @@
+name: BTC MA 2% band daily signal
+
+on:
+  schedule:
+    # 매일 09:05 / 09:35 / 10:05 KST. 예약 실행이 늦거나 빠지는 경우를 대비해 세 번 걸고,
+    # 이미 처리한 날은 signal.py 가 건너뛴다.
+    - cron: "5 0 * * *"
+    - cron: "35 0 * * *"
+    - cron: "5 1 * * *"
+  workflow_dispatch:
+    inputs:
+      manual:
+        description: "현재 상태를 텔레그램으로 받기 (상태 파일은 바꾸지 않음)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc-ma-band-daily
+  cancel-in-progress: false
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Daily signal
+        env:
+          MANUAL: ${{ inputs.manual && '1' || '0' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python btc-ma-band-daily/signal.py
+
+      - name: Save state
+        run: |
+          if [ -n "$(git status --porcelain btc-ma-band-daily/state.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+            git add btc-ma-band-daily/state.json
+            git commit -m "Update BTC MA 2% band daily state"
+            git push
+          fi
