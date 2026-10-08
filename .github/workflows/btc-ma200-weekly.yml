@@ -1,12 +1,14 @@
 name: BTC MA200 weekly signal
 
 on:
-  schedule:
-    # 매주 월요일 09:05 / 09:35 / 10:05 KST. GitHub 예약 실행이 늦거나 빠지는 경우를 대비해 세 번 걸고,
-    # 이미 처리한 주는 signal.py 가 건너뛴다.
-    - cron: "5 0 * * 1"
-    - cron: "35 0 * * 1"
-    - cron: "5 1 * * 1"
+  # 예약 실행은 꺼 두었다. 알림을 120·200일선 2% 여유 폭 매일 신호(btc-ma-band-daily)로 바꿨기 때문.
+  # 다시 켜려면 아래 주석을 푼다.
+  # schedule:
+  #   # 매주 월요일 09:05 / 09:35 / 10:05 KST. GitHub 예약 실행이 늦거나 빠지는 경우를 대비해 세 번 걸고,
+  #   # 이미 처리한 주는 signal.py 가 건너뛴다.
+  #   - cron: "5 0 * * 1"
+  #   - cron: "35 0 * * 1"
+  #   - cron: "5 1 * * 1"
   workflow_dispatch:
     inputs:
       manual:
