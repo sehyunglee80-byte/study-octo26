@@ -334,6 +334,37 @@ def main():
             cells.append(pct(x["total"], 0))
         L.append(f"| {y}{'(진행 중)' if y == d[-1].year else ''} | " + " | ".join(cells) + " |")
 
+    # 차트용 데이터: 2022-01-03부터, 매일 '둘 다 위' 전략
+    k, d, c = window(date(2022, 1, 3))
+    both = [a & b for a, b in zip(above(120, k), above(200, k))]
+    w200 = weekly(d, above(200, k))
+    trades, entry = [], None
+    for i in range(len(both)):
+        prev = both[i - 1] if i else 0
+        if both[i] and not prev:
+            entry = i
+        if prev and not both[i]:
+            trades.append({"buy": d[entry].isoformat(), "buyPrice": c[entry], "sell": d[i].isoformat(), "sellPrice": c[i],
+                           "ret": round((c[i] / c[entry]) * (1 - FEE) ** 2 - 1, 5), "days": (d[i] - d[entry]).days})
+    if both[-1]:
+        trades.append({"buy": d[entry].isoformat(), "buyPrice": c[entry], "sell": None, "sellPrice": c[-1],
+                       "ret": round((c[-1] / c[entry]) * (1 - FEE) - 1, 5), "days": (d[-1] - d[entry]).days})
+    chart = {
+        "generated": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+        "fee": FEE,
+        "dates": [x.isoformat() for x in d],
+        "close": [round(x) for x in c],
+        "ma120": [round(MA[120][i]) for i in range(k, len(C))],
+        "ma200": [round(MA[200][i]) for i in range(k, len(C))],
+        "pos": both,
+        "eqBoth": [round(x, 5) for x in equity(c, both)],
+        "eqWeekly200": [round(x, 5) for x in equity(c, w200)],
+        "eqHold": [round(x, 5) for x in equity(c, [1] * len(c))],
+        "trades": trades,
+    }
+    with open(os.path.join(os.path.dirname(OUT), "chart-data.json"), "w", encoding="utf-8") as f:
+        json.dump(chart, f, separators=(",", ":"))
+
     text = "\n".join(L) + "\n"
     print(text)
     with open(OUT, "w", encoding="utf-8") as f:
