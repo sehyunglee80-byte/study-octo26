@@ -13,6 +13,7 @@
   - 고점은 시뮬레이션 시작 이후 최고 종가 (시작일을 지수 고점 근처로 잡음)
   안: A 지침 그대로 (S&P500 -10/-20/-30% → VOO) / B 나스닥100 -10/-20/-30% → QQQM
       C 나스닥100 -10/-20/-30% → TQQQ / D 나스닥100 -15/-30/-45% → TQQQ / E 바이 더 딥 없음
+      F S&P500 -10/-20%는 VOO, -30%만 TQQQ / G 나스닥100 -10/-20%는 QQQM, -30%만 TQQQ (3차만 레버리지)
 
 공통: 매년 11월 첫 거래일 리밸런싱, 거래 비용 0.1%, 원금 5억원.
 원화 구간은 해외주식 양도세(연 250만원 공제 후 22%, 다음 해 5월, 평균단가) 반영, 달러 구간은 세금 없음.
@@ -30,14 +31,16 @@ import backtest_stock_ma as bs
 import tqqq_moonshot as tm
 import validate_buffer as vb
 
-W = np.array([0.35, 0.15, 0.25, 0.20, 0.05, 0.0])     # VOO, QQQM, SGOV, 원화현금(투더문+비트코인 자리), 금, 딥
-TAXABLE = [0, 1, 2, 5]
+W = np.array([0.35, 0.15, 0.25, 0.20, 0.05, 0.0, 0.0])  # VOO, QQQM, SGOV, 원화현금(투더문+비트코인 자리), 금, 딥 1·2차, 딥 3차
+TAXABLE = [0, 1, 2, 5, 6]
 PLANS = [
-    ("A 지침: S&P500 -10/-20/-30% → VOO", "spx", (0.10, 0.20, 0.30), "voo"),
-    ("B 나스닥100 -10/-20/-30% → QQQM", "ndx", (0.10, 0.20, 0.30), "qqqm"),
-    ("C 나스닥100 -10/-20/-30% → TQQQ", "ndx", (0.10, 0.20, 0.30), "tqqq"),
-    ("D 나스닥100 -15/-30/-45% → TQQQ", "ndx", (0.15, 0.30, 0.45), "tqqq"),
-    ("E 바이 더 딥 없음", None, (), None),
+    ("A 지침: S&P500 -10/-20/-30% → VOO", "spx", (0.10, 0.20, 0.30), ("voo", "voo")),
+    ("B 나스닥100 -10/-20/-30% → QQQM", "ndx", (0.10, 0.20, 0.30), ("qqqm", "qqqm")),
+    ("C 나스닥100 -10/-20/-30% → TQQQ", "ndx", (0.10, 0.20, 0.30), ("tqqq", "tqqq")),
+    ("D 나스닥100 -15/-30/-45% → TQQQ", "ndx", (0.15, 0.30, 0.45), ("tqqq", "tqqq")),
+    ("E 바이 더 딥 없음", None, (), (None, None)),
+    ("F S&P500 -10/-20% VOO, -30% TQQQ", "spx", (0.10, 0.20, 0.30), ("voo", "tqqq")),
+    ("G 나스닥100 -10/-20% QQQM, -30% TQQQ", "ndx", (0.10, 0.20, 0.30), ("qqqm", "tqqq")),
 ]
 
 
@@ -48,15 +51,16 @@ def load():
 
 
 def simulate(d, start, end, plan, krw=True):
-    _, base, ths, asset = plan
+    _, base, ths, assets = plan
     x = d.loc[start:end]
     dates = x.index
     fxg = (x["fx"] / x["fx"].shift(1)).fillna(1).to_numpy() if krw else np.ones(len(x))
     cash = (1 + tm.CMA) ** (x["days"].to_numpy() / 365.25) if krw else 1 + x["rf"].to_numpy()
-    r_dip = {"voo": x["r_spy"], "qqqm": x["r_u"], "tqqq": x["r_tq"], None: x["rf"]}[asset].fillna(0).to_numpy()
+    rmap = {"voo": x["r_spy"], "qqqm": x["r_u"], "tqqq": x["r_tq"], None: x["rf"]}
+    r_dip1, r_dip3 = (rmap[a].fillna(0).to_numpy() for a in assets)
     G = np.column_stack([(1 + x["r_spy"].fillna(0)).to_numpy() * fxg, (1 + x["r_u"].fillna(0)).to_numpy() * fxg,
                          (1 + x["rf"]).to_numpy() * fxg, cash, (1 + x["r_gold"].fillna(0)).to_numpy() * fxg,
-                         (1 + r_dip) * fxg])
+                         (1 + r_dip1) * fxg, (1 + r_dip3) * fxg])
     G[0] = 1
     level = x[base].to_numpy() if base else None
     taxable = TAXABLE if krw else []
@@ -95,10 +99,11 @@ def simulate(d, start, end, plan, krw=True):
                     sell(i, vals[i] * f, dt.year)
                 vals = vals * (1 - f)
         if ep is not None:
-            ep["low"] = min(ep["low"], vals[5] / ep["cost"] - 1) if ep["cost"] > 0 else 0
+            ep["low"] = min(ep["low"], (vals[5] + vals[6]) / ep["cost"] - 1) if ep["cost"] > 0 else 0
         # 전날 신호 실행
         if pending_exit:
-            ep.update(end=dt.date(), ret=vals[5] / ep["cost"] - 1)
+            ep.update(end=dt.date(), ret=(vals[5] + vals[6]) / ep["cost"] - 1,
+                      ret3=vals[6] / ep["cost3"] - 1 if ep["cost3"] else np.nan)
             episodes.append(ep)
             ep, done, pending_exit = None, 0, False
             rebalance(dt.year)
@@ -107,12 +112,15 @@ def simulate(d, start, end, plan, krw=True):
             sell(2, amt, dt.year)
             vals[2] -= amt
             amt *= 1 - tm.COST
-            vals[5] += amt
-            if 5 in taxable:
-                basis[5] += amt
+            col = 6 if done == 2 else 5
+            vals[col] += amt
+            if col in taxable:
+                basis[col] += amt
             if ep is None:
-                ep = dict(start=dt.date(), cost=0.0, low=0.0, buys=[])
+                ep = dict(start=dt.date(), cost=0.0, cost3=0.0, low=0.0, buys=[])
             ep["cost"] += amt
+            if col == 6:
+                ep["cost3"] += amt
             ep["buys"].append(str(dt.date()))
             done += 1
             pending_buy = False
@@ -130,7 +138,8 @@ def simulate(d, start, end, plan, krw=True):
         eq[t] = vals.sum()
 
     if ep is not None:
-        ep.update(end="진행 중", ret=vals[5] / ep["cost"] - 1)
+        ep.update(end="진행 중", ret=(vals[5] + vals[6]) / ep["cost"] - 1,
+                  ret3=vals[6] / ep["cost3"] - 1 if ep["cost3"] else np.nan)
         episodes.append(ep)
     s = pd.Series(eq / tm.CAPITAL, dates)
     m = bs.metrics(s.to_numpy(), dates)
@@ -175,12 +184,12 @@ def main():
         L.append("")
     L.append("=" * 110 + "\n딥 기록 (투입 금액 기준 수익률, 최대 평가손실은 투입 후 가장 크게 물렸을 때)\n" + "=" * 110)
     for title, s0, e0, krw in runs[:2]:
-        for plan in PLANS[:4]:
+        for plan in PLANS[:4] + PLANS[5:]:
             eps = logs[(title, plan[0])]
             L.append(f"\n[{title[:20]} · {plan[0]}]")
             L.append(vb.table(eps, [("start", "첫 매수", None), ("buys", "매수일", lambda b: ", ".join(b)),
                                     ("end", "종료(고점 회복)", None), ("ret", "딥 자금 수익", pct),
-                                    ("low", "최대 평가손실", pct)]) if eps else "  없음")
+                                    ("ret3", "3차 수익", pct), ("low", "최대 평가손실", pct)]) if eps else "  없음")
     text = "\n".join(L)
     with open(os.path.join(bs.RES_DIR, "summary_dip_tqqq.txt"), "w", encoding="utf-8") as f:
         f.write(text)
