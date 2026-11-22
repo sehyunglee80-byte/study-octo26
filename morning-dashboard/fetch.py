@@ -1,7 +1,7 @@
 """아침 지표 대시보드용 데이터를 야후 파이낸스에서 받아 data.json 으로 저장한다.
 
 지표
-  - S&P500(^GSPC), 나스닥100(^NDX), SOXL: 최근 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
+  - S&P500(^GSPC), 나스닥100(^NDX), SOXL, 코스피(^KS11): 최근 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
   - 원달러(KRW=X): 직전 서울 외환시장 마감 시점(15:30 KST) 환율, 최근 3개 연도 연평균과 3개년 평균,
     최근 3년(롤링) 평균
   - 차트용 최근 1년 종가
@@ -24,6 +24,7 @@ INDEXES = [
     ("sp500", "^GSPC", "S&P 500"),
     ("ndx", "^NDX", "나스닥 100"),
     ("soxl", "SOXL", "SOXL"),
+    ("kospi", "^KS11", "코스피"),
 ]
 
 
@@ -129,16 +130,23 @@ def write_dashboard_files(data):
         w.writerow(cols)
         for key, _, _ in INDEXES:
             v = data[key]
-            w.writerow([key] + [v[c] for c in cols[1:]])
+            row = [key]
+            for c in cols[1:]:
+                x = v[c]
+                if c in ("close", "prev_close", "ath_close"):
+                    x = int(round(x))
+                elif c in ("change_pct", "from_ath_pct"):
+                    x = round(x, 1)
+                row.append(x)
+            w.writerow(row)
     fx = data["usdkrw"]
     with open(os.path.join(out, "fx.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["item", "label", "date", "rate"])
-        w.writerow(["rate_1530", "15:30 KST 환율", fx["date"], fx["rate_1530"]])
-        for y, r in fx["yearly_avg"].items():
-            w.writerow([f"avg_{y}", f"{y}년 평균", y, r])
-        w.writerow(["avg_3y", f"3개년 평균({fx['avg_3y_label']})", "", fx["avg_3y"]])
-        w.writerow(["avg_rolling_3y", "최근 3년 롤링 평균", "", fx["avg_rolling_3y"]])
+        r0 = lambda x: int(round(x)) if x is not None else ""
+        w.writerow(["rate_1530", "15:30 KST 환율", fx["date"], r0(fx["rate_1530"])])
+        w.writerow(["avg_3y", f"3개년 평균({fx['avg_3y_label']})", "", r0(fx["avg_3y"])])
+        w.writerow(["avg_rolling_3y", "최근 3년 롤링 평균", "", r0(fx["avg_rolling_3y"])])
     hist = {}
     keys = [k for k, _, _ in INDEXES] + ["usdkrw"]
     for k in keys:
