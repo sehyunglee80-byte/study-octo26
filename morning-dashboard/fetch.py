@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
-CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={rng}&interval={itv}"
+CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?{span}&interval={itv}"
 
 # (키, 야후 티커, 표시 이름)
 INDEXES = [
@@ -27,7 +27,12 @@ INDEXES = [
 
 
 def get_chart(sym, rng, itv):
-    url = CHART.format(sym=urllib.request.quote(sym), rng=rng, itv=itv)
+    # range=max 나 긴 기간은 야후가 월봉으로 바꿔 주므로, 일봉은 period1/period2 로 요청한다
+    if rng == "max":
+        span = f"period1=0&period2={int(time.time())}"
+    else:
+        span = f"range={rng}"
+    url = CHART.format(sym=urllib.request.quote(sym), span=span, itv=itv)
     last = None
     for i in range(4):
         try:
@@ -55,6 +60,7 @@ def local_date(ts, res):
 
 def index_block(sym, name):
     res = get_chart(sym, "max", "1d")
+    assert res["meta"].get("dataGranularity") == "1d", f"{sym}: 일봉이 아님"
     s = series(res)
     t_last, c_last = s[-1]
     _, c_prev = s[-2]
@@ -83,7 +89,7 @@ def fx_block(now):
         if start.hour == 15 and start.minute == 0:
             at_1530 = (start.strftime("%Y-%m-%d"), c)
     # 2) 연평균: 일봉 종가 평균
-    daily = get_chart("KRW=X", "5y", "1d")
+    daily = get_chart("KRW=X", "max", "1d")
     s = series(daily)
     by_year = {}
     for t, c in s:
