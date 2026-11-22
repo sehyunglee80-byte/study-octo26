@@ -37,18 +37,19 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
 # 차트 머리글 → (키, 한국어 이름, 순서)
 SECTORS = {
-    "S&P 500": ("sp500", "S&P500", 0),
-    "Info. Technology": ("it", "IT", 1),
-    "Comm. Services": ("comm", "통신", 2),
-    "Consumer Disc.": ("discretionary", "경기소비", 3),
-    "Consumer Staples": ("staples", "필수소비", 4),
-    "Health Care": ("health", "헬스케어", 5),
-    "Financials": ("financials", "금융", 6),
-    "Industrials": ("industrials", "산업재", 7),
-    "Energy": ("energy", "에너지", 8),
-    "Materials": ("materials", "소재", 9),
-    "Utilities": ("utilities", "유틸", 10),
-    "Real Estate": ("realestate", "부동산", 11),
+    # 차트 머리글: (키, 이름, 순서, 묶음). 묶음: 경기민감 / 중간 / 경기방어
+    "S&P 500": ("sp500", "S&P500", 0, "전체"),
+    "Info. Technology": ("it", "IT", 1, "경기민감"),
+    "Consumer Disc.": ("discretionary", "경기소비", 2, "경기민감"),
+    "Financials": ("financials", "금융", 3, "경기민감"),
+    "Industrials": ("industrials", "산업재", 4, "경기민감"),
+    "Materials": ("materials", "소재", 5, "경기민감"),
+    "Energy": ("energy", "에너지", 6, "경기민감"),
+    "Comm. Services": ("comm", "통신", 7, "중간"),
+    "Real Estate": ("realestate", "부동산", 8, "중간"),
+    "Consumer Staples": ("staples", "필수소비", 9, "경기방어"),
+    "Health Care": ("health", "헬스케어", 10, "경기방어"),
+    "Utilities": ("utilities", "유틸", 11, "경기방어"),
 }
 
 
@@ -222,9 +223,9 @@ def write(values, report_date):
     rows = sorted(((SECTORS[k], v) for k, v in values.items()), key=lambda x: x[0][2])
     with open(os.path.join(OUT, "sectors.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["key", "name", "report_date", "fwd_pe", "avg_5y", "avg_10y", "vs_5y_pct", "vs_10y_pct"])
-        for (key, name, _), (pe, a5, a10) in rows:
-            w.writerow([key, name, report_date, pe, a5, a10, round((pe / a5 - 1) * 100, 1), round((pe / a10 - 1) * 100, 1)])
+        w.writerow(["key", "name", "group", "report_date", "fwd_pe", "avg_5y", "avg_10y", "vs_5y_pct", "vs_10y_pct"])
+        for (key, name, _, group), (pe, a5, a10) in rows:
+            w.writerow([key, name, group, report_date, pe, a5, a10, round((pe / a5 - 1) * 100, 1), round((pe / a10 - 1) * 100, 1)])
     meta = {"generated_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"), "report_date": report_date,
             "source": "FactSet Earnings Insight"}
     with open(os.path.join(HERE, "meta.json"), "w", encoding="utf-8") as f:
