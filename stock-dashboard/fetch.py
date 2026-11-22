@@ -32,7 +32,18 @@ STOCKS = [
     ("META", "메타"),
     ("NVDA", "엔비디아"),
     ("TSLA", "테슬라"),
+    ("000660.KS", "SK하이닉스"),
+    ("SPCX", "SpaceX"),
+    ("ANT", "Anthropic"),
 ]
+
+# 야후 섹터 분류 → 대시보드 섹터 카드의 이름
+SECTOR_KO = {
+    "Technology": "IT", "Communication Services": "통신", "Consumer Cyclical": "경기소비",
+    "Consumer Defensive": "필수소비", "Healthcare": "헬스케어", "Financial Services": "금융",
+    "Industrials": "산업재", "Energy": "에너지", "Basic Materials": "소재", "Utilities": "유틸",
+    "Real Estate": "부동산",
+}
 MAS = (50, 200)
 
 _cj = http.cookiejar.CookieJar()
@@ -78,6 +89,7 @@ def chart(sym):
     res = get_json(url)["chart"]["result"][0]
     assert res["meta"].get("dataGranularity") == "1d", f"{sym}: 일봉이 아님"
     off = res["meta"].get("gmtoffset", 0)
+    chart.currency = res["meta"].get("currency")
     closes = res["indicators"]["quote"][0].get("close") or []
     pts = []
     for t, c in zip(res.get("timestamp") or [], closes):
@@ -87,7 +99,7 @@ def chart(sym):
 
 
 def summary(sym):
-    mods = "summaryDetail,defaultKeyStatistics,earningsTrend,calendarEvents"
+    mods = "summaryDetail,defaultKeyStatistics,earningsTrend,calendarEvents,assetProfile"
     c = urllib.request.quote(crumb())
     last = None
     for host in ("query2", "query1"):
@@ -122,7 +134,7 @@ def stock_block(sym, name):
     closes = [c for _, c in pts]
     i = len(pts) - 1
     d_last, c_last = pts[-1]
-    c_prev = closes[-2]
+    c_prev = closes[-2] if len(closes) > 1 else None
     d_ath, c_ath = max(pts, key=lambda x: x[1])
     yr = closes[-252:]
     hi52, lo52 = max(yr), min(yr)
@@ -130,6 +142,8 @@ def stock_block(sym, name):
     row = {
         "ticker": sym,
         "name": name,
+        "currency": chart.currency,
+        "sector": None,
         "date": d_last,
         "close": int(round(c_last)),
         "market_cap_tn": None,
@@ -159,6 +173,8 @@ def stock_block(sym, name):
     }
     try:
         s = summary(sym)
+        sec = (s.get("assetProfile") or {}).get("sector")
+        row["sector"] = SECTOR_KO.get(sec, sec)
         mc = raw(s, "summaryDetail", "marketCap")
         row["market_cap_tn"] = round(mc / 1e12, 2) if mc else None
         tpe = raw(s, "summaryDetail", "trailingPE")
@@ -206,13 +222,11 @@ def main():
         for r in rows:
             w.writerow({k: ("" if v is None else v) for k, v in r.items()})
     cols = [c for sym, _ in STOCKS for c in (sym, f"{sym}_ma50", f"{sym}_ma200")]
-    first = max(min(d for d in hist if hist[d].get(sym) not in (None, "")) for sym, _ in STOCKS)
     with open(os.path.join(OUT, "history.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["date"] + cols)
         for d in sorted(hist):
-            if d >= first:
-                w.writerow([d] + [hist[d].get(c, "") for c in cols])
+            w.writerow([d] + [hist[d].get(c, "") for c in cols])
     meta = {"generated_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"), "source": "Yahoo Finance"}
     with open(os.path.join(HERE, "meta.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False)
