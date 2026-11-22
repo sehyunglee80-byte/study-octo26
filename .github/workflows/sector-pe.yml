@@ -1,0 +1,52 @@
+name: Sector PE data
+
+# S&P 500 섹터별 선행 PER (FactSet Earnings Insight 주간 보고서). 보고서는 보통 금요일에 나온다.
+# Claude 예약 작업이 workflow_dispatch 로 실행하고, 07:30 KST 백업 실행을 걸어 둔다.
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      check:
+        description: "시험용: 이 날짜(MMDDYY) 보고서를 읽기만 함"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sector-pe
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: |
+          sudo apt-get install -y -qq poppler-utils tesseract-ocr >/dev/null
+          pip install -q pillow
+
+      - name: Check an older report
+        if: ${{ github.event.inputs.check != '' }}
+        run: python sector-pe/fetch.py "${{ github.event.inputs.check }}"
+
+      - name: Fetch data
+        run: python sector-pe/fetch.py
+
+      - name: Save data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add sector-pe/meta.json sector-pe/out
+          if ! git diff --cached --quiet; then
+            git commit -m "Update sector PE data"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+          fi
