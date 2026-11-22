@@ -1,7 +1,7 @@
 """아침 지표 대시보드용 데이터를 야후 파이낸스에서 받아 data.json 으로 저장한다.
 
 지표
-  - S&P500(^GSPC), 나스닥100(^NDX), SOXL, 코스피(^KS11), 미국 10년물(^TNX), VIX(^VIX), 금(GC=F), 비트코인(BTC-USD): 최근 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
+  - S&P500(^GSPC), 나스닥100(^NDX), SOXL, 코스피(^KS11), 미국 10년물(^TNX), VIX(^VIX), 금(GC=F), WTI 유가(CL=F), 비트코인(BTC-USD): 최근 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
   - 원달러(KRW=X): 직전 서울 외환시장 마감 시점(15:30 KST) 환율, 최근 3개 연도 연평균과 3개년 평균,
     최근 3년(롤링) 평균
   - 차트용 최근 1년 종가
@@ -28,6 +28,7 @@ INDEXES = [
     ("tnx", "^TNX", "미국 10년물 금리"),
     ("vix", "^VIX", "VIX"),
     ("gold", "GC=F", "금"),
+    ("wti", "CL=F", "WTI 유가"),
     ("btc", "BTC-USD", "비트코인"),
 ]
 
@@ -59,7 +60,7 @@ def series(res):
     return [(t, c) for t, c in zip(ts, closes) if c is not None]
 
 
-DECIMALS = {"soxl": 1, "tnx": 2, "vix": 1}  # 정수가 아닌 자릿수로 보여 줄 지표
+DECIMALS = {"soxl": 1, "tnx": 2, "vix": 1, "wti": 1}  # 정수가 아닌 자릿수로 보여 줄 지표
 MAS = (50, 200)  # 차트 이동평균선(거래일 기준)
 
 
