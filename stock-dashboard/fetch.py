@@ -1,7 +1,7 @@
 """개별 종목(M7) 대시보드용 데이터를 야후 파이낸스에서 받아 out/ 에 CSV 로 저장한다.
 
 종목별 항목
-  - 가격: 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
+  - 가격: 종가(정수), 시가총액(조 달러), 전일 대비, 종가 기준 전고점과 전고점 대비 %
   - 추세: 50일·200일 이동평균과 종가의 위치, 52주 고점·저점 사이 현재 위치(0% = 저점, 100% = 고점)
   - 밸류: 후행 PER, 선행 PER (야후 값)
   - 이익 전망: 다음 회계연도 EPS 컨센서스와 30일·90일 전 대비 변화율
@@ -131,7 +131,8 @@ def stock_block(sym, name):
         "ticker": sym,
         "name": name,
         "date": d_last,
-        "close": round(c_last, 2),
+        "close": int(round(c_last)),
+        "market_cap_tn": None,
         "change_pct": pct(c_last, c_prev),
         "ath_close": round(c_ath, 2),
         "ath_date": d_ath,
@@ -152,6 +153,8 @@ def stock_block(sym, name):
     }
     try:
         s = summary(sym)
+        mc = raw(s, "summaryDetail", "marketCap")
+        row["market_cap_tn"] = round(mc / 1e12, 2) if mc else None
         tpe = raw(s, "summaryDetail", "trailingPE")
         fpe = raw(s, "summaryDetail", "forwardPE") or raw(s, "defaultKeyStatistics", "forwardPE")
         row["trailing_pe"] = round(tpe, 1) if tpe else None
