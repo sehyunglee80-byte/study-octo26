@@ -37,17 +37,17 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
 # 차트 머리글 → (키, 한국어 이름, 순서)
 SECTORS = {
-    "S&P 500": ("sp500", "S&P 500 전체", 0),
-    "Info. Technology": ("it", "정보기술", 1),
-    "Comm. Services": ("comm", "커뮤니케이션 서비스", 2),
-    "Consumer Disc.": ("discretionary", "경기소비재", 3),
-    "Consumer Staples": ("staples", "필수소비재", 4),
+    "S&P 500": ("sp500", "S&P500", 0),
+    "Info. Technology": ("it", "IT", 1),
+    "Comm. Services": ("comm", "통신", 2),
+    "Consumer Disc.": ("discretionary", "경기소비", 3),
+    "Consumer Staples": ("staples", "필수소비", 4),
     "Health Care": ("health", "헬스케어", 5),
     "Financials": ("financials", "금융", 6),
     "Industrials": ("industrials", "산업재", 7),
     "Energy": ("energy", "에너지", 8),
     "Materials": ("materials", "소재", 9),
-    "Utilities": ("utilities", "유틸리티", 10),
+    "Utilities": ("utilities", "유틸", 10),
     "Real Estate": ("realestate", "부동산", 11),
 }
 
