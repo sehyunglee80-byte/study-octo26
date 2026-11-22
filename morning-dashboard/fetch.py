@@ -1,7 +1,7 @@
 """아침 지표 대시보드용 데이터를 야후 파이낸스에서 받아 data.json 으로 저장한다.
 
 지표
-  - S&P500(^GSPC), 나스닥100(^NDX), SOXL, 코스피(^KS11): 최근 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
+  - S&P500(^GSPC), 나스닥100(^NDX), SOXL, 코스피(^KS11), 미국 10년물(^TNX), VIX(^VIX), 금(GC=F), 비트코인(BTC-USD): 최근 종가, 전일 대비, 종가 기준 전고점과 전고점 대비 %
   - 원달러(KRW=X): 직전 서울 외환시장 마감 시점(15:30 KST) 환율, 최근 3개 연도 연평균과 3개년 평균,
     최근 3년(롤링) 평균
   - 차트용 최근 1년 종가
@@ -25,6 +25,10 @@ INDEXES = [
     ("ndx", "^NDX", "나스닥 100"),
     ("soxl", "SOXL", "SOXL"),
     ("kospi", "^KS11", "코스피"),
+    ("tnx", "^TNX", "미국 10년물 금리"),
+    ("vix", "^VIX", "VIX"),
+    ("gold", "GC=F", "금"),
+    ("btc", "BTC-USD", "비트코인"),
 ]
 
 
@@ -55,7 +59,7 @@ def series(res):
     return [(t, c) for t, c in zip(ts, closes) if c is not None]
 
 
-DECIMAL1 = {"soxl"}  # 가격을 소수점 첫째 자리까지 보여 줄 종목
+DECIMALS = {"soxl": 1, "tnx": 2, "vix": 1}  # 정수가 아닌 자릿수로 보여 줄 지표
 MAS = (50, 200)  # 차트 이동평균선(거래일 기준)
 
 
@@ -144,17 +148,18 @@ def write_dashboard_files(data):
     """대시보드가 읽는 CSV 3개: indexes.csv, fx.csv, history.csv (out/ 폴더)."""
     out = os.path.join(os.path.dirname(OUT), "out")
     os.makedirs(out, exist_ok=True)
-    cols = ["key", "name", "ticker", "date", "close", "prev_close", "change_pct", "ath_close", "ath_date", "from_ath_pct"]
+    cols = ["key", "name", "ticker", "date", "close", "prev_close", "change", "change_pct", "ath_close", "ath_date", "from_ath_pct"]
     with open(os.path.join(out, "indexes.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(cols)
         for key, _, _ in INDEXES:
             v = data[key]
             row = [key]
+            nd = DECIMALS.get(key, 0)
             for c in cols[1:]:
-                x = v[c]
-                if c in ("close", "prev_close", "ath_close"):
-                    x = round(x, 1) if key in DECIMAL1 else int(round(x))
+                x = v["close"] - v["prev_close"] if c == "change" else v[c]
+                if c in ("close", "prev_close", "ath_close", "change"):
+                    x = round(x, nd) if nd else int(round(x))
                 elif c in ("change_pct", "from_ath_pct"):
                     x = round(x, 1)
                 row.append(x)
