@@ -8,27 +8,18 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: FactSet OCR
+      - name: Render page
         run: |
-          sudo apt-get install -y -qq poppler-utils tesseract-ocr >/dev/null
+          sudo apt-get install -y -qq poppler-utils >/dev/null
           base="https://advantage.factset.com/hubfs/Website/Resources%20Section/Research%20Desk/Earnings%20Insight"
           curl -sL -A "Mozilla/5.0" -o ei.pdf "$base/EarningsInsight_112026.pdf"
-          pdfinfo ei.pdf | grep -i -E "pages|creation"
           p=$(pdftotext -layout ei.pdf - | awk -v RS='\f' '/Forward 12M P\/E Ratio: Sector Level/{print NR; exit}')
-          echo "page $p"
-          pdftoppm -f $p -l $p -r 250 -png ei.pdf pg
-          tesseract pg-*.png - --psm 6 2>/dev/null
-      - name: Yahoo ETF
-        run: |
-          python - <<'PY'
-          import sys; sys.path.insert(0, "stock-dashboard")
-          import fetch, json
-          for s in ["SPY","XLK","XLF","XLV","XLY","XLP","XLC","XLI","XLE","XLU","XLB","XLRE","SMH","SOXX","RSP"]:
-              try:
-                  r = fetch.get_json(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{s}?modules=summaryDetail,defaultKeyStatistics&crumb={fetch.crumb()}", tries=2)["quoteSummary"]["result"][0]
-                  sd, ks = r.get("summaryDetail", {}), r.get("defaultKeyStatistics", {})
-                  print(s, "tPE", fetch.raw(sd,"trailingPE"), "fPE", fetch.raw(sd,"forwardPE") or fetch.raw(ks,"forwardPE"))
-              except Exception as e:
-                  print(s, "ERR", e)
-          PY
+          mkdir out
+          pdftoppm -f $p -l $p -r 150 -png ei.pdf out/page
+          pdfimages -f $p -l $p -list ei.pdf
+          pdfimages -f $p -l $p -png ei.pdf out/img
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: page
+          path: out
