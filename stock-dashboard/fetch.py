@@ -151,6 +151,8 @@ def stock_block(sym, name):
         "eps_next_fy": None,
         "eps_next_fy_end": None,
         "eps_next_fy_analysts": None,
+        "eps_30d_ago": None,
+        "eps_90d_ago": None,
         "eps_rev_30d_pct": None,
         "eps_rev_90d_pct": None,
         "next_earnings": None,
@@ -171,8 +173,10 @@ def stock_block(sym, name):
             if t.get("period") == "+1y":
                 row["eps_next_fy_end"] = t.get("endDate")
                 row["eps_next_fy_analysts"] = raw(t, "earningsEstimate", "numberOfAnalysts")
-                print(sym, "+1y", json.dumps(t.get("epsTrend"), ensure_ascii=False), json.dumps(t.get("epsRevisions"), ensure_ascii=False))
                 cur = raw(t, "epsTrend", "current")
+                e30, e90 = raw(t, "epsTrend", "30daysAgo"), raw(t, "epsTrend", "90daysAgo")
+                row["eps_30d_ago"] = round(e30, 2) if e30 else None
+                row["eps_90d_ago"] = round(e90, 2) if e90 else None
                 row["eps_next_fy"] = round(cur, 2) if cur else None
                 row["eps_rev_30d_pct"] = pct(cur, raw(t, "epsTrend", "30daysAgo"))
                 row["eps_rev_90d_pct"] = pct(cur, raw(t, "epsTrend", "90daysAgo"))
