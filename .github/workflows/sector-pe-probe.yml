@@ -1,6 +1,6 @@
 name: Sector PE probe
 
-# 임시: FactSet Earnings Insight PDF 에서 섹터 PER 을 뽑을 수 있는지 확인용. 확인 후 삭제한다.
+# 임시: 섹터 PER 데이터 출처 확인용. 확인 후 삭제한다.
 on:
   workflow_dispatch:
 
@@ -8,18 +8,27 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Download and dump
+      - uses: actions/checkout@v4
+      - name: FactSet OCR
         run: |
-          sudo apt-get install -y -qq poppler-utils >/dev/null
+          sudo apt-get install -y -qq poppler-utils tesseract-ocr >/dev/null
           base="https://advantage.factset.com/hubfs/Website/Resources%20Section/Research%20Desk/Earnings%20Insight"
-          for d in 112026 111326; do
-            code=$(curl -sL -A "Mozilla/5.0" -o ei_$d.pdf -w "%{http_code}" "$base/EarningsInsight_$d.pdf")
-            echo "== $d HTTP $code"; file ei_$d.pdf
-          done
-          f=$(ls -S ei_*.pdf | head -1); echo "using $f"
-          pdfinfo $f | head -5
-          pdftotext -layout $f out.txt
-          grep -n -i "P/E" out.txt | head -60
-          echo "===== sector level pages"
-          awk '/Sector Level/{f=1} f{print; n++} n>80{exit}' out.txt
-          echo "===== images count"; pdfimages -list $f | wc -l
+          curl -sL -A "Mozilla/5.0" -o ei.pdf "$base/EarningsInsight_112026.pdf"
+          pdfinfo ei.pdf | grep -i -E "pages|creation"
+          p=$(pdftotext -layout ei.pdf - | awk -v RS='\f' '/Forward 12M P\/E Ratio: Sector Level/{print NR; exit}')
+          echo "page $p"
+          pdftoppm -f $p -l $p -r 250 -png ei.pdf pg
+          tesseract pg-*.png - --psm 6 2>/dev/null
+      - name: Yahoo ETF
+        run: |
+          python - <<'PY'
+          import sys; sys.path.insert(0, "stock-dashboard")
+          import fetch, json
+          for s in ["SPY","XLK","XLF","XLV","XLY","XLP","XLC","XLI","XLE","XLU","XLB","XLRE","SMH","SOXX","RSP"]:
+              try:
+                  r = fetch.get_json(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{s}?modules=summaryDetail,defaultKeyStatistics&crumb={fetch.crumb()}", tries=2)["quoteSummary"]["result"][0]
+                  sd, ks = r.get("summaryDetail", {}), r.get("defaultKeyStatistics", {})
+                  print(s, "tPE", fetch.raw(sd,"trailingPE"), "fPE", fetch.raw(sd,"forwardPE") or fetch.raw(ks,"forwardPE"))
+              except Exception as e:
+                  print(s, "ERR", e)
+          PY
