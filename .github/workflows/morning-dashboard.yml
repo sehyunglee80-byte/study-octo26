@@ -31,7 +31,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add morning-dashboard/data.json
+          git add morning-dashboard/data.json morning-dashboard/out
           if ! git diff --cached --quiet; then
             git commit -m "Update morning dashboard data"
             for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done

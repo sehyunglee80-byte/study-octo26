@@ -8,6 +8,7 @@
 
 표준 라이브러리만 사용한다. 지표를 늘리려면 INDEXES 에 추가한다.
 """
+import csv
 import json
 import os
 import time
@@ -114,8 +115,42 @@ def fx_block(now):
         "avg_3y_label": f"{years[0]}–{years[-1]} 일평균",
         "vs_avg_3y_pct": round((rate / avg3 - 1) * 100, 2) if rate and avg3 else None,
         "avg_rolling_3y": round(sum(rolling) / len(rolling), 2) if rolling else None,
-        "history": [[local_date(t, daily), round(c, 2)] for t, c in s[-252:]],
+        "history": [[local_date(t, daily), round(c, 2)] for t, c in s[-300:]],
     }
+
+
+def write_dashboard_files(data):
+    """대시보드가 읽는 CSV 3개: indexes.csv, fx.csv, history.csv (out/ 폴더)."""
+    out = os.path.join(os.path.dirname(OUT), "out")
+    os.makedirs(out, exist_ok=True)
+    cols = ["key", "name", "ticker", "date", "close", "prev_close", "change_pct", "ath_close", "ath_date", "from_ath_pct"]
+    with open(os.path.join(out, "indexes.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        for key, _, _ in INDEXES:
+            v = data[key]
+            w.writerow([key] + [v[c] for c in cols[1:]])
+    fx = data["usdkrw"]
+    with open(os.path.join(out, "fx.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["item", "label", "date", "rate"])
+        w.writerow(["rate_1530", "15:30 KST 환율", fx["date"], fx["rate_1530"]])
+        for y, r in fx["yearly_avg"].items():
+            w.writerow([f"avg_{y}", f"{y}년 평균", y, r])
+        w.writerow(["avg_3y", f"3개년 평균({fx['avg_3y_label']})", "", fx["avg_3y"]])
+        w.writerow(["avg_rolling_3y", "최근 3년 롤링 평균", "", fx["avg_rolling_3y"]])
+    hist = {}
+    keys = [k for k, _, _ in INDEXES] + ["usdkrw"]
+    for k in keys:
+        for d, c in data[k]["history"]:
+            hist.setdefault(d, {})[k] = c
+    first = data[INDEXES[0][0]]["history"][0][0]
+    with open(os.path.join(out, "history.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["date"] + keys)
+        for d in sorted(hist):
+            if d >= first:
+                w.writerow([d] + [hist[d].get(k, "") for k in keys])
 
 
 def main():
@@ -126,6 +161,7 @@ def main():
     data["usdkrw"] = fx_block(now)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
+    write_dashboard_files(data)
     summary = {k: v for k, v in data.items() if not isinstance(v, dict)}
     for k, v in data.items():
         if isinstance(v, dict):
