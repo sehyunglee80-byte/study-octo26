@@ -3,8 +3,8 @@
 종목별 항목
   - 가격: 종가(정수), 시가총액(조 달러), 전일 대비, 종가 기준 전고점과 전고점 대비 %
   - 추세: 50일·200일 이동평균과 종가의 위치, 52주 고점·저점 사이 현재 위치(0% = 저점, 100% = 고점)
-  - 밸류: 후행 PER, 선행 PER (야후 값)
-  - 이익 전망: 다음 회계연도 EPS 컨센서스와 30일·90일 전 대비 변화율
+  - 밸류: 후행 PER(야후 값), 선행 PER(종가 ÷ 향후 12개월 EPS 컨센서스, 직접 계산)
+  - 이익 전망: 향후 12개월(NTM) EPS 컨센서스와 90일 전 값. 올해·다음 회계연도 추정치를 남은 기간으로 가중평균
   - 일정: 다음 실적 발표일
   - 차트용 최근 1년 종가와 이동평균
 
@@ -124,6 +124,10 @@ def ma(closes, i, n):
     return sum(closes[i - n + 1:i + 1]) / n if i + 1 >= n else None
 
 
+def r2n(x):
+    return round(x, 2) if x is not None else None
+
+
 def pct(a, b):
     return round((a / b - 1) * 100, 1) if a is not None and b else None
 
@@ -164,10 +168,10 @@ def stock_block(sym, name):
         "eps_next_fy": None,
         "eps_next_fy_end": None,
         "eps_next_fy_analysts": None,
-        "eps_30d_ago": None,
-        "eps_90d_ago": None,
-        "eps_rev_30d_pct": None,
-        "eps_rev_90d_pct": None,
+        "ntm_weight_0y": None,
+        "eps_ntm": None,
+        "eps_ntm_90d": None,
+        "forward_pe_yahoo": None,
         "next_earnings": None,
     }
     try:
@@ -179,22 +183,33 @@ def stock_block(sym, name):
         tpe = raw(s, "summaryDetail", "trailingPE")
         fpe = raw(s, "summaryDetail", "forwardPE") or raw(s, "defaultKeyStatistics", "forwardPE")
         row["trailing_pe"] = round(tpe, 1) if tpe else None
-        row["forward_pe"] = round(fpe, 1) if fpe else None
-        for t in (s.get("earningsTrend") or {}).get("trend", []):
-            if t.get("period") == "0y":
-                c0 = raw(t, "epsTrend", "current")
-                row["eps_cur_fy"] = round(c0, 2) if c0 else None
-                row["eps_cur_fy_end"] = t.get("endDate")
-            if t.get("period") == "+1y":
-                row["eps_next_fy_end"] = t.get("endDate")
-                row["eps_next_fy_analysts"] = raw(t, "earningsEstimate", "numberOfAnalysts")
-                cur = raw(t, "epsTrend", "current")
-                e30, e90 = raw(t, "epsTrend", "30daysAgo"), raw(t, "epsTrend", "90daysAgo")
-                row["eps_30d_ago"] = round(e30, 2) if e30 else None
-                row["eps_90d_ago"] = round(e90, 2) if e90 else None
-                row["eps_next_fy"] = round(cur, 2) if cur else None
-                row["eps_rev_30d_pct"] = pct(cur, raw(t, "epsTrend", "30daysAgo"))
-                row["eps_rev_90d_pct"] = pct(cur, raw(t, "epsTrend", "90daysAgo"))
+        row["forward_pe_yahoo"] = round(fpe, 1) if fpe else None
+        trend = {t.get("period"): t for t in (s.get("earningsTrend") or {}).get("trend", [])}
+        t0, t1 = trend.get("0y"), trend.get("+1y")
+        if t0:
+            row["eps_cur_fy"] = r2n(raw(t0, "epsTrend", "current"))
+            row["eps_cur_fy_end"] = t0.get("endDate")
+        if t1:
+            row["eps_next_fy"] = r2n(raw(t1, "epsTrend", "current"))
+            row["eps_next_fy_end"] = t1.get("endDate")
+            row["eps_next_fy_analysts"] = raw(t1, "earningsEstimate", "numberOfAnalysts")
+        # 향후 12개월(NTM) EPS: 올해 회계연도(0y)의 남은 기간 비율만큼 0y, 나머지를 다음 회계연도(+1y)로 가중평균
+        if t0 and t1 and t0.get("endDate"):
+            end0 = datetime.strptime(t0["endDate"], "%Y-%m-%d").date()
+            base = datetime.strptime(d_last, "%Y-%m-%d").date()
+            w0 = min(1.0, max(0.0, (end0 - base).days / 365))
+            row["ntm_weight_0y"] = round(w0, 3)
+
+            def ntm(key):
+                a, b = raw(t0, "epsTrend", key), raw(t1, "epsTrend", key)
+                if a is None or b is None:
+                    return None
+                return round(w0 * a + (1 - w0) * b, 2)
+
+            row["eps_ntm"] = ntm("current")
+            row["eps_ntm_90d"] = ntm("90daysAgo")
+            if row["eps_ntm"] and row["eps_ntm"] > 0:
+                row["forward_pe"] = round(c_last / row["eps_ntm"], 1)
         dates = ((s.get("calendarEvents") or {}).get("earnings") or {}).get("earningsDate") or []
         if dates:
             row["next_earnings"] = datetime.fromtimestamp(dates[0]["raw"], tz=KST).strftime("%Y-%m-%d")
