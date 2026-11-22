@@ -1,0 +1,38 @@
+name: Stock dashboard data
+
+# M7 종목 대시보드 데이터. Claude 예약 작업이 workflow_dispatch 로 실행하고,
+# 07:25 KST 백업 실행을 걸어 둔다.
+on:
+  schedule:
+    - cron: "25 22 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stock-dashboard
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch data
+        run: python stock-dashboard/fetch.py
+
+      - name: Save data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add stock-dashboard/meta.json stock-dashboard/out
+          if ! git diff --cached --quiet; then
+            git commit -m "Update stock dashboard data"
+            for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+          fi
