@@ -55,6 +55,27 @@ def series(res):
     return [(t, c) for t, c in zip(ts, closes) if c is not None]
 
 
+DECIMAL1 = {"soxl"}  # 가격을 소수점 첫째 자리까지 보여 줄 종목
+MAS = (50, 200)  # 차트 이동평균선(거래일 기준)
+
+
+def with_ma(points, keep):
+    """(ts, close) 전체 목록에 이동평균을 붙여 마지막 keep 개만 돌려준다: [(ts, close, ma50, ma200)]."""
+    closes = [c for _, c in points]
+    out = []
+    for i in range(max(0, len(points) - keep), len(points)):
+        row = [points[i][0], points[i][1]]
+        for n in MAS:
+            row.append(sum(closes[i - n + 1:i + 1]) / n if i + 1 >= n else None)
+        out.append(row)
+    return out
+
+
+def hist_rows(points, res, keep):
+    r2 = lambda x: round(x, 2) if x is not None else None
+    return [[local_date(t, res), r2(c)] + [r2(m) for m in mas] for t, c, *mas in with_ma(points, keep)]
+
+
 def local_date(ts, res):
     off = res["meta"].get("gmtoffset", 0)
     return datetime.fromtimestamp(ts + off, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -67,7 +88,6 @@ def index_block(sym, name):
     t_last, c_last = s[-1]
     _, c_prev = s[-2]
     t_ath, c_ath = max(s, key=lambda x: x[1])
-    one_year = s[-252:]
     return {
         "name": name,
         "ticker": sym,
@@ -78,7 +98,7 @@ def index_block(sym, name):
         "ath_close": round(c_ath, 2),
         "ath_date": local_date(t_ath, res),
         "from_ath_pct": round((c_last / c_ath - 1) * 100, 2),
-        "history": [[local_date(t, res), round(c, 2)] for t, c in one_year],
+        "history": hist_rows(s, res, 252),
     }
 
 
@@ -116,7 +136,7 @@ def fx_block(now):
         "avg_3y_label": f"{years[0]}–{years[-1]} 일평균",
         "vs_avg_3y_pct": round((rate / avg3 - 1) * 100, 2) if rate and avg3 else None,
         "avg_rolling_3y": round(sum(rolling) / len(rolling), 2) if rolling else None,
-        "history": [[local_date(t, daily), round(c, 2)] for t, c in s[-300:]],
+        "history": hist_rows(s, daily, 300),
     }
 
 
@@ -134,7 +154,7 @@ def write_dashboard_files(data):
             for c in cols[1:]:
                 x = v[c]
                 if c in ("close", "prev_close", "ath_close"):
-                    x = int(round(x))
+                    x = round(x, 1) if key in DECIMAL1 else int(round(x))
                 elif c in ("change_pct", "from_ath_pct"):
                     x = round(x, 1)
                 row.append(x)
@@ -145,20 +165,24 @@ def write_dashboard_files(data):
         w.writerow(["item", "label", "date", "rate"])
         r0 = lambda x: int(round(x)) if x is not None else ""
         w.writerow(["rate_1530", "15:30 KST 환율", fx["date"], r0(fx["rate_1530"])])
-        w.writerow(["avg_3y", f"3개년 평균({fx['avg_3y_label']})", "", r0(fx["avg_3y"])])
         w.writerow(["avg_rolling_3y", "최근 3년 롤링 평균", "", r0(fx["avg_rolling_3y"])])
     hist = {}
     keys = [k for k, _, _ in INDEXES] + ["usdkrw"]
+    cols = []
     for k in keys:
-        for d, c in data[k]["history"]:
-            hist.setdefault(d, {})[k] = c
+        cols += [k] + [f"{k}_ma{n}" for n in MAS]
+        for d, c, *mas in data[k]["history"]:
+            row = hist.setdefault(d, {})
+            row[k] = c
+            for n, m in zip(MAS, mas):
+                row[f"{k}_ma{n}"] = m
     first = data[INDEXES[0][0]]["history"][0][0]
     with open(os.path.join(out, "history.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["date"] + keys)
+        w.writerow(["date"] + cols)
         for d in sorted(hist):
             if d >= first:
-                w.writerow([d] + [hist[d].get(k, "") for k in keys])
+                w.writerow([d] + [("" if hist[d].get(c) is None else hist[d][c]) for c in cols])
 
 
 def main():
