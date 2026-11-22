@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 KST = timezone(timedelta(hours=9))
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
-UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json"}
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "Accept": "*/*"}
 
 # (야후 티커, 표시 이름)
 STOCKS = [
@@ -61,9 +61,16 @@ def crumb():
         _opener.open(urllib.request.Request("https://fc.yahoo.com", headers=UA), timeout=30)
     except Exception:  # noqa: BLE001  (404 를 주지만 쿠키는 남는다)
         pass
-    with _opener.open(urllib.request.Request("https://query2.finance.yahoo.com/v1/test/getcrumb", headers=UA), timeout=30) as r:
-        _crumb = r.read().decode().strip()
-    return _crumb
+    last = None
+    for host in ("query2", "query1"):
+        try:
+            with _opener.open(urllib.request.Request(f"https://{host}.finance.yahoo.com/v1/test/getcrumb", headers=UA), timeout=30) as r:
+                _crumb = r.read().decode().strip()
+            if _crumb and "<" not in _crumb:
+                return _crumb
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise RuntimeError(f"crumb 실패: {last}")
 
 
 def chart(sym):
@@ -81,8 +88,15 @@ def chart(sym):
 
 def summary(sym):
     mods = "summaryDetail,defaultKeyStatistics,earningsTrend,calendarEvents"
-    url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{sym}?modules={mods}&crumb={urllib.request.quote(crumb())}"
-    return get_json(url)["quoteSummary"]["result"][0]
+    c = urllib.request.quote(crumb())
+    last = None
+    for host in ("query2", "query1"):
+        try:
+            url = f"https://{host}.finance.yahoo.com/v10/finance/quoteSummary/{sym}?modules={mods}&crumb={c}"
+            return get_json(url, tries=2)["quoteSummary"]["result"][0]
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise RuntimeError(last)
 
 
 def raw(d, *keys):
