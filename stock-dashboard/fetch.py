@@ -32,6 +32,7 @@ STOCKS = [
     ("META", "메타"),
     ("NVDA", "엔비디아"),
     ("TSLA", "테슬라"),
+    ("MU", "마이크론"),
     ("SPCX", "SpaceX"),
     ("ANT", "Anthropic"),
 ]
