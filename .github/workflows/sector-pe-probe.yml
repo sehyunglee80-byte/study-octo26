@@ -19,7 +19,4 @@ jobs:
           pdfimages -f $p -l $p -list ei.pdf
           pdfimages -f $p -l $p -png ei.pdf out/img
           ls -la out
-      - uses: actions/upload-artifact@v4
-        with:
-          name: page
-          path: out
+          echo BEGIN1; base64 -w0 out/img-001.png; echo; echo END1
