@@ -146,7 +146,11 @@ def stock_block(sym, name):
         "vs_ma200_pct": pct(c_last, ma200),
         "trailing_pe": None,
         "forward_pe": None,
+        "eps_cur_fy": None,
+        "eps_cur_fy_end": None,
         "eps_next_fy": None,
+        "eps_next_fy_end": None,
+        "eps_next_fy_analysts": None,
         "eps_rev_30d_pct": None,
         "eps_rev_90d_pct": None,
         "next_earnings": None,
@@ -160,7 +164,14 @@ def stock_block(sym, name):
         row["trailing_pe"] = round(tpe, 1) if tpe else None
         row["forward_pe"] = round(fpe, 1) if fpe else None
         for t in (s.get("earningsTrend") or {}).get("trend", []):
+            if t.get("period") == "0y":
+                c0 = raw(t, "epsTrend", "current")
+                row["eps_cur_fy"] = round(c0, 2) if c0 else None
+                row["eps_cur_fy_end"] = t.get("endDate")
             if t.get("period") == "+1y":
+                row["eps_next_fy_end"] = t.get("endDate")
+                row["eps_next_fy_analysts"] = raw(t, "earningsEstimate", "numberOfAnalysts")
+                print(sym, "+1y", json.dumps(t.get("epsTrend"), ensure_ascii=False), json.dumps(t.get("epsRevisions"), ensure_ascii=False))
                 cur = raw(t, "epsTrend", "current")
                 row["eps_next_fy"] = round(cur, 2) if cur else None
                 row["eps_rev_30d_pct"] = pct(cur, raw(t, "epsTrend", "30daysAgo"))
